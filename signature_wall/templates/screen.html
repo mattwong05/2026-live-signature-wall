@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>签名大屏</title>
+  <link rel="stylesheet" href="/static/screen.css">
+</head>
+<body>
+  <main class="screen-shell">
+    <div id="backgroundImageLayer" class="background-image-layer"></div>
+    <canvas id="backgroundCanvas" class="layer"></canvas>
+    <canvas id="playbackCanvas" class="layer"></canvas>
+
+    <section class="overlay">
+      <p class="eyebrow">Signature Wall</p>
+      <h1 id="screenTitle">现场签名正在汇聚</h1>
+      <p id="screenHint" class="hint hidden"></p>
+      <button id="fullscreenButton" type="button" class="fullscreen-button">进入全屏</button>
+    </section>
+  </main>
+
+  <script src="/static/screen.js" defer></script>
+</body>
+</html>

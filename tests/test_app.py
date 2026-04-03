@@ -1,0 +1,171 @@
+from __future__ import annotations
+
+import tempfile
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+
+from signature_wall.main import app
+from signature_wall.storage import SignatureStore
+
+
+def sample_payload(x_offset: int = 0) -> dict[str, object]:
+    return {
+        "canvas_width": 800,
+        "canvas_height": 400,
+        "strokes": [
+            [
+                {"x": 20 + x_offset, "y": 20, "t": 0},
+                {"x": 60 + x_offset, "y": 48, "t": 35},
+            ]
+        ],
+    }
+
+
+def test_signature_submission_and_playback_completion() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        app.dependency_overrides = {}
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.store.init_db()
+
+        client = TestClient(app)
+
+        create_response = client.post("/api/signatures", json=sample_payload())
+        assert create_response.status_code == 201
+        signature_id = create_response.json()["signature_id"]
+
+        get_response = client.get(f"/api/signatures/{signature_id}")
+        assert get_response.status_code == 200
+        assert get_response.json()["strokes"][0][1]["t"] == 35
+
+        state_response = client.get("/api/screen-state")
+        assert state_response.status_code == 200
+        assert len(state_response.json()["pending_signatures"]) == 1
+
+        complete_response = client.post(f"/api/signatures/{signature_id}/complete")
+        assert complete_response.status_code == 200
+
+        updated_state = client.get("/api/screen-state").json()
+        assert len(updated_state["pending_signatures"]) == 0
+        assert len(updated_state["background_signatures"]) == 1
+
+
+def test_completion_must_follow_queue_order() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.store.init_db()
+
+        client = TestClient(app)
+
+        first = client.post("/api/signatures", json=sample_payload()).json()["signature_id"]
+        second = client.post("/api/signatures", json=sample_payload(100)).json()["signature_id"]
+
+        response = client.post(f"/api/signatures/{second}/complete")
+        assert response.status_code == 409
+
+        first_response = client.post(f"/api/signatures/{first}/complete")
+        assert first_response.status_code == 200
+
+
+def test_empty_signature_is_rejected() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.store.init_db()
+
+        client = TestClient(app)
+        response = client.post(
+            "/api/signatures",
+            json={
+                "canvas_width": 800,
+                "canvas_height": 400,
+                "strokes": [],
+            },
+        )
+        assert response.status_code == 400
+
+
+def test_background_image_setting_round_trip() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.DB_PATH = Path(tmp_dir) / "test.db"
+        main_module.UPLOADS_DIR = Path(tmp_dir) / "uploads"
+        main_module.BACKGROUND_DIR = main_module.UPLOADS_DIR / "backgrounds"
+        main_module.store.init_db()
+        main_module.BACKGROUND_DIR.mkdir(parents=True, exist_ok=True)
+
+        client = TestClient(app)
+
+        response = client.post(
+            "/api/admin/background-image",
+            files={"file": ("bg.png", b"fake-image-content", "image/png")},
+        )
+        assert response.status_code == 200
+        image_url = response.json()["background_image_url"]
+        assert image_url.startswith("/uploads/backgrounds/background_")
+
+        state_response = client.get("/api/screen-state")
+        assert state_response.status_code == 200
+        assert state_response.json()["background_image_url"] == image_url
+
+        delete_response = client.delete("/api/admin/background-image")
+        assert delete_response.status_code == 200
+        assert delete_response.json()["background_image_url"] is None
+
+
+def test_admin_host_ip_and_clear_signatures() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.DB_PATH = Path(tmp_dir) / "test.db"
+        main_module.UPLOADS_DIR = Path(tmp_dir) / "uploads"
+        main_module.BACKGROUND_DIR = main_module.UPLOADS_DIR / "backgrounds"
+        main_module.store.init_db()
+        main_module.BACKGROUND_DIR.mkdir(parents=True, exist_ok=True)
+
+        client = TestClient(app)
+
+        config_response = client.put("/api/admin/config/ip", json={"host_ip": "192.168.31.118"})
+        assert config_response.status_code == 200
+        assert config_response.json()["sign_page_url"] == "http://192.168.31.118:8000/sign"
+
+        qr_response = client.get("/api/admin/sign-qr.svg")
+        assert qr_response.status_code == 200
+        assert qr_response.headers["content-type"].startswith("image/svg+xml")
+
+        client.post("/api/signatures", json=sample_payload())
+        client.post("/api/signatures", json=sample_payload(80))
+
+        clear_response = client.delete("/api/admin/signatures")
+        assert clear_response.status_code == 200
+        assert clear_response.json()["cleared"] == 2
+
+        state_response = client.get("/api/screen-state")
+        assert state_response.status_code == 200
+        assert state_response.json()["pending_signatures"] == []
+        assert state_response.json()["background_signatures"] == []
+
+
+def test_admin_screen_title_round_trip() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.store.init_db()
+
+        client = TestClient(app)
+        response = client.put("/api/admin/config/title", json={"screen_title": "欢迎来到签名现场"})
+        assert response.status_code == 200
+        assert response.json()["screen_title"] == "欢迎来到签名现场"
+
+        state_response = client.get("/api/screen-state")
+        assert state_response.status_code == 200
+        assert state_response.json()["screen_title"] == "欢迎来到签名现场"

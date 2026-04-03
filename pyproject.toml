@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "signature-wall"
+version = "0.6.1"
+description = "A local LAN signature wall service with a signing page and a large-screen playback page."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.111,<1.0",
+    "python-multipart>=0.0.9,<1.0",
+    "qrcode>=8.0,<9.0",
+    "starlette>=0.46,<1.0",
+    "uvicorn[standard]>=0.30,<1.0",
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+dev = [
+    "httpx>=0.27,<1.0",
+    "pytest>=8.0,<9.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["signature_wall*"]

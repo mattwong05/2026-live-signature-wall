@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>签名页</title>
+    <link rel="stylesheet" href="/static/sign.css">
+  </head>
+<body>
+  <main class="sign-shell">
+    <section class="sign-card">
+      <p class="eyebrow">现场签名</p>
+      <h1>请在下方完成签名</h1>
+      <p class="subtitle">提交后，大屏会按你的真实书写节奏回放签名。</p>
+
+      <div class="canvas-frame">
+        <canvas id="signatureCanvas"></canvas>
+      </div>
+
+      <div class="actions">
+        <button id="resetButton" type="button" class="secondary">重置</button>
+        <button id="submitButton" type="button" class="primary">提交</button>
+      </div>
+
+      <p id="statusMessage" class="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="/static/sign.js" defer></script>
+</body>
+</html>

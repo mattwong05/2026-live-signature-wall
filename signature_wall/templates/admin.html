@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理页</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+  <main class="admin-shell">
+    <section class="admin-card">
+      <p class="eyebrow">Admin</p>
+      <h1>大屏管理页</h1>
+      <p class="subtitle">在这里维护大屏底图、局域网签名入口二维码，以及现场签名数据。</p>
+
+      <section class="admin-section">
+        <h2>背景图</h2>
+        <div class="preview-frame">
+          <img id="backgroundPreview" class="preview-image hidden" alt="背景预览">
+          <div id="emptyState" class="preview-empty">当前未设置背景图</div>
+        </div>
+
+        <div class="controls">
+          <input id="backgroundFile" type="file" accept="image/png,image/jpeg,image/webp">
+          <div class="actions">
+            <button id="uploadButton" type="button" class="primary">上传背景图</button>
+            <button id="clearButton" type="button" class="secondary">清除背景图</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <h2>签名页二维码</h2>
+        <label class="field">
+          <span>本机局域网 IP</span>
+          <input id="hostIpInput" type="text" placeholder="例如 192.168.31.118">
+        </label>
+        <div class="actions">
+          <button id="saveIpButton" type="button" class="primary">保存并生成二维码</button>
+        </div>
+        <p id="signPageUrl" class="link-text">尚未配置签名页地址</p>
+        <div class="qr-frame">
+          <img id="qrPreview" class="qr-image hidden" alt="签名页二维码">
+          <div id="qrEmptyState" class="preview-empty">保存本机 IP 后将在这里显示二维码</div>
+        </div>
+      </section>
+
+      <section class="admin-section">
+        <h2>大屏标题</h2>
+        <label class="field">
+          <span>Screen 标题</span>
+          <input id="screenTitleInput" type="text" placeholder="例如 现场签名正在汇聚">
+        </label>
+        <div class="actions">
+          <button id="saveTitleButton" type="button" class="primary">保存标题</button>
+        </div>
+      </section>
+
+      <section class="admin-section danger">
+        <h2>签名数据</h2>
+        <p class="section-copy">清空后，待播放队列和历史背景签名都会立即移除。</p>
+        <div class="actions">
+          <button id="clearSignaturesButton" type="button" class="danger-button">清空全部签名</button>
+        </div>
+      </section>
+
+      <p id="adminStatus" class="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="/static/admin.js" defer></script>
+</body>
+</html>
