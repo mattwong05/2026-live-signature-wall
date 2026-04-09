@@ -150,6 +150,103 @@ button:disabled {
   color: #236c47;
 }
 
+.toast {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 40;
+  width: min(calc(100vw - 32px), 420px);
+  padding: 20px 24px;
+  border-radius: 24px;
+  background:
+    linear-gradient(145deg, rgba(255, 251, 244, 0.98), rgba(245, 237, 224, 0.96));
+  border: 1px solid rgba(125, 95, 56, 0.18);
+  color: #24435e;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+  box-shadow:
+    0 24px 64px rgba(25, 35, 47, 0.16),
+    0 8px 26px rgba(125, 95, 56, 0.12);
+  transform: translate(-50%, calc(-50% + 18px)) scale(0.94);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.toast::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(29, 93, 134, 0.28), rgba(212, 162, 92, 0.32));
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+.toast::after {
+  content: "";
+  position: absolute;
+  inset: 10px auto auto 12px;
+  width: 68px;
+  height: 68px;
+  background: radial-gradient(circle, rgba(212, 162, 92, 0.18), transparent 70%);
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+.toast-celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.toast-celebration.hidden {
+  display: none;
+}
+
+.toast-ribbon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 32px;
+  border-radius: 999px;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  animation: ribbon-burst 1200ms cubic-bezier(0.18, 0.82, 0.22, 1) forwards;
+}
+
+@keyframes ribbon-burst {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(var(--rotation)) translateY(0) scale(0.3);
+  }
+  12% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--rotation))
+      translateY(var(--travel))
+      translateX(var(--drift))
+      scale(1);
+  }
+}
+
 .sign-overlay {
   position: fixed;
   inset: 0;
@@ -258,6 +355,17 @@ button:disabled {
 }
 
 @media (max-width: 640px) {
+  .toast {
+    width: min(calc(100vw - 24px), 420px);
+    padding: 18px 20px;
+    font-size: 16px;
+  }
+
+  .toast::after {
+    width: 56px;
+    height: 56px;
+  }
+
   .sign-card {
     padding: 24px;
   }

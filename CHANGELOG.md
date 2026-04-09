@@ -18,6 +18,34 @@ The format is based on Keep a Changelog.
 ### Removed
 - None.
 
+## [0.12.5] - 2026-04-09
+
+### Added
+- 签名页提交成功后新增轻量彩带庆祝特效。
+
+### Changed
+- 提交成功 Toast 改为页面中央展示，并统一为与签名页一致的暖色系视觉风格。
+
+### Fixed
+- None.
+
+### Removed
+- None.
+
+## [0.12.4] - 2026-04-09
+
+### Added
+- 签名页新增提交成功 Toast 强提示组件。
+
+### Changed
+- 移动端签名提交成功后，原来的底部状态提示改为更醒目的 Toast 弹窗反馈。
+
+### Fixed
+- None.
+
+### Removed
+- None.
+
 ## [0.12.3] - 2026-04-09
 
 ### Added

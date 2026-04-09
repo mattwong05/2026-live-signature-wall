@@ -9,6 +9,8 @@ const expandedSigningOverlay = document.getElementById("expandedSigningOverlay")
 const phoneSigningHint = document.getElementById("phoneSigningHint");
 const statusMessage = document.getElementById("statusMessage");
 const pledgeLine = document.getElementById("pledgeLine");
+const toastCelebration = document.getElementById("toastCelebration");
+const toastMessage = document.getElementById("toastMessage");
 
 const baseContext = baseCanvas.getContext("2d");
 const expandedContext = expandedCanvas.getContext("2d");
@@ -24,6 +26,8 @@ let activeCanvas = null;
 let sessionStart = 0;
 let pledgeLines = [];
 let submissionSize = { width: 0, height: 0 };
+let toastTimer = null;
+let toastCleanupTimer = null;
 
 function updateExpandedWorkbenchLayout() {
   const stage = expandedSigningOverlay.querySelector(".sign-overlay-stage");
@@ -55,6 +59,66 @@ function updateExpandedWorkbenchLayout() {
 function showStatus(message, type = "") {
   statusMessage.textContent = message;
   statusMessage.className = `status ${type}`.trim();
+}
+
+function hideToast() {
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  if (toastCleanupTimer) {
+    window.clearTimeout(toastCleanupTimer);
+    toastCleanupTimer = null;
+  }
+  toastMessage.classList.remove("visible");
+  toastCelebration.classList.add("hidden");
+  toastCleanupTimer = window.setTimeout(() => {
+    if (!toastMessage.classList.contains("visible")) {
+      toastMessage.classList.add("hidden");
+      toastMessage.textContent = "";
+      toastCelebration.replaceChildren();
+    }
+  }, 220);
+}
+
+function triggerCelebration() {
+  const palette = ["#1d5d86", "#d4a25c", "#87b5d6", "#e8ded0", "#7d5f38"];
+  toastCelebration.replaceChildren();
+  toastCelebration.classList.remove("hidden");
+
+  for (let index = 0; index < 20; index += 1) {
+    const ribbon = document.createElement("span");
+    ribbon.className = "toast-ribbon";
+    ribbon.style.background = palette[index % palette.length];
+    ribbon.style.setProperty("--rotation", `${(index * 18) - 170}deg`);
+    ribbon.style.setProperty("--travel", `${-150 - Math.random() * 120}px`);
+    ribbon.style.setProperty("--drift", `${(Math.random() - 0.5) * 180}px`);
+    ribbon.style.left = `${50 + (Math.random() - 0.5) * 18}%`;
+    ribbon.style.top = `${50 + (Math.random() - 0.5) * 10}%`;
+    ribbon.style.width = `${10 + Math.random() * 5}px`;
+    ribbon.style.height = `${22 + Math.random() * 18}px`;
+    ribbon.style.animationDelay = `${Math.random() * 90}ms`;
+    toastCelebration.appendChild(ribbon);
+  }
+}
+
+function showToast(message, duration = 2600) {
+  if (toastTimer) {
+    window.clearTimeout(toastTimer);
+  }
+  if (toastCleanupTimer) {
+    window.clearTimeout(toastCleanupTimer);
+    toastCleanupTimer = null;
+  }
+  toastMessage.textContent = message;
+  toastMessage.classList.remove("hidden");
+  triggerCelebration();
+  window.requestAnimationFrame(() => {
+    toastMessage.classList.add("visible");
+  });
+  toastTimer = window.setTimeout(() => {
+    hideToast();
+  }, duration);
 }
 
 function isPhoneLikeDevice() {
@@ -402,9 +466,11 @@ async function submitSignature() {
 
     resetSignature();
     closeExpandedSigning();
-    showStatus("签名提交成功，大屏将按顺序播放。", "success");
+    showStatus("");
+    showToast("签名提交成功，大屏将按顺序播放。");
   } catch (error) {
     console.error(error);
+    hideToast();
     showStatus("提交失败，请稍后重试。", "error");
   } finally {
     submitButton.disabled = false;
