@@ -239,6 +239,22 @@ class SignatureStore:
             conn.commit()
         return int(row["count"])
 
+    def total_signature_count(self) -> int:
+        with self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) AS count FROM signatures").fetchone()
+        return int(row["count"])
+
+    def list_all_signatures(self) -> list[SignatureRecord]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT id, created_at, canvas_width, canvas_height, strokes_json
+                FROM signatures
+                ORDER BY sequence ASC
+                """
+            ).fetchall()
+        return [self._row_to_record(row) for row in rows]
+
     def get_screen_title(self) -> str:
         with self._connect() as conn:
             row = conn.execute(
@@ -262,6 +278,37 @@ class SignatureStore:
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
                 (normalized,),
+            )
+            conn.commit()
+        return normalized
+
+    def get_pledge_lines(self) -> list[str]:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT value
+                FROM settings
+                WHERE key = 'pledge_lines'
+                """
+            ).fetchone()
+        if row is None:
+            return [
+                "依法管水、科学配水、节水优先，守护右江灌区每一滴水",
+                "珍惜水资源、使用节水器具、参与灌区节水，让水润万家",
+                "小手拉大手，节水一起走，做右江灌区的小小节水宣传员",
+            ]
+        return json.loads(row["value"])
+
+    def set_pledge_lines(self, pledge_lines: list[str]) -> list[str]:
+        normalized = [line.strip() for line in pledge_lines if line.strip()]
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO settings (key, value)
+                VALUES ('pledge_lines', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (json.dumps(normalized, ensure_ascii=False),),
             )
             conn.commit()
         return normalized

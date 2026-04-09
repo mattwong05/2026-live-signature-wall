@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import tempfile
+import zipfile
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -50,6 +52,10 @@ def test_signature_submission_and_playback_completion() -> None:
         updated_state = client.get("/api/screen-state").json()
         assert len(updated_state["pending_signatures"]) == 0
         assert len(updated_state["background_signatures"]) == 1
+
+        admin_config = client.get("/api/admin/config")
+        assert admin_config.status_code == 200
+        assert admin_config.json()["signature_count"] == 1
 
 
 def test_completion_must_follow_queue_order() -> None:
@@ -169,3 +175,83 @@ def test_admin_screen_title_round_trip() -> None:
         state_response = client.get("/api/screen-state")
         assert state_response.status_code == 200
         assert state_response.json()["screen_title"] == "欢迎来到签名现场"
+
+
+def test_pledge_lines_round_trip_and_sign_config() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.store.init_db()
+
+        client = TestClient(app)
+        pledge_lines = [
+            "依法管水、科学配水、节水优先，守护右江灌区每一滴水",
+            "珍惜水资源、使用节水器具、参与灌区节水，让水润万家",
+        ]
+        response = client.put("/api/admin/config/pledges", json={"pledge_lines": pledge_lines})
+        assert response.status_code == 200
+        assert response.json()["pledge_lines"] == pledge_lines
+
+        sign_config_response = client.get("/api/sign-config")
+        assert sign_config_response.status_code == 200
+        assert sign_config_response.json()["pledge_lines"] == pledge_lines
+
+
+def test_export_signatures_zip_contains_pngs() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.store.init_db()
+
+        client = TestClient(app)
+        client.post("/api/signatures", json=sample_payload())
+        client.post("/api/signatures", json=sample_payload(120))
+
+        config_response = client.get("/api/admin/config")
+        assert config_response.status_code == 200
+        assert config_response.json()["signature_count"] == 2
+
+        export_response = client.get("/api/admin/signatures/export")
+        assert export_response.status_code == 200
+        assert export_response.headers["content-type"].startswith("application/zip")
+
+        archive = zipfile.ZipFile(io.BytesIO(export_response.content))
+        names = archive.namelist()
+        assert len(names) == 2
+        assert all(name.endswith(".png") for name in names)
+
+
+def test_admin_config_is_not_cacheable() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.store.init_db()
+
+        client = TestClient(app)
+        client.post("/api/signatures", json=sample_payload())
+
+        response = client.get("/api/admin/config")
+        assert response.status_code == 200
+        assert response.json()["signature_count"] == 1
+        assert response.headers["cache-control"] == "no-store, no-cache, must-revalidate, max-age=0"
+
+
+def test_admin_end_sequence_broadcasts_websocket_event() -> None:
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        from signature_wall import main as main_module
+
+        main_module.store = SignatureStore(Path(tmp_dir) / "test.db")
+        main_module.store.init_db()
+
+        client = TestClient(app)
+
+        with client.websocket_connect("/ws/screen") as websocket:
+            response = client.post("/api/admin/end-sequence")
+            assert response.status_code == 200
+            assert response.json()["started"] is True
+
+            payload = websocket.receive_json()
+            assert payload["type"] == "ending_sequence_started"

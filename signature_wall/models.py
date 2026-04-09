@@ -49,11 +49,21 @@ class AdminConfigResponse(BaseModel):
     host_ip: str | None = None
     sign_page_url: str | None = None
     screen_title: str = "现场签名正在汇聚"
+    pledge_lines: list[str] = []
+    signature_count: int = 0
 
 
 class ClearSignaturesResponse(BaseModel):
     cleared: int
 
 
+class EndSequenceResponse(BaseModel):
+    started: bool = True
+
+
 class ScreenTitlePayload(BaseModel):
     screen_title: str = Field(min_length=1, max_length=80)
+
+
+class PledgeLinesPayload(BaseModel):
+    pledge_lines: list[str] = Field(min_length=1)

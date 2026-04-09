@@ -2,6 +2,7 @@ const canvas = document.getElementById("signatureCanvas");
 const resetButton = document.getElementById("resetButton");
 const submitButton = document.getElementById("submitButton");
 const statusMessage = document.getElementById("statusMessage");
+const pledgeLine = document.getElementById("pledgeLine");
 
 const context = canvas.getContext("2d");
 let strokes = [];
@@ -11,13 +12,21 @@ let sessionStart = 0;
 let logicalWidth = 0;
 let logicalHeight = 0;
 let deviceScale = 1;
+let pledgeLines = [];
 
 function showStatus(message, type = "") {
   statusMessage.textContent = message;
   statusMessage.className = `status ${type}`.trim();
 }
 
+function applyResponsiveCard() {
+  const card = document.querySelector(".sign-card");
+  const landscape = window.innerWidth > window.innerHeight;
+  card.classList.toggle("landscape", landscape);
+}
+
 function setupCanvas() {
+  applyResponsiveCard();
   deviceScale = Math.max(window.devicePixelRatio || 1, 1);
   const rect = canvas.getBoundingClientRect();
   logicalWidth = Math.round(rect.width);
@@ -32,6 +41,42 @@ function setupCanvas() {
   context.strokeStyle = "#1f2f44";
   context.fillStyle = "#1f2f44";
   redraw();
+}
+
+function chooseRandomPledge() {
+  if (!pledgeLines.length) {
+    pledgeLine.textContent = "依法管水、科学配水、节水优先，守护右江灌区每一滴水";
+    return;
+  }
+  const index = Math.floor(Math.random() * pledgeLines.length);
+  pledgeLine.textContent = pledgeLines[index];
+}
+
+async function loadSignConfig() {
+  const response = await fetch("/api/sign-config");
+  if (!response.ok) {
+    throw new Error("Failed to load sign config");
+  }
+  const data = await response.json();
+  pledgeLines = Array.isArray(data.pledge_lines) ? data.pledge_lines : [];
+  chooseRandomPledge();
+}
+
+async function requestSignFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    }
+    if (window.screen?.orientation?.lock) {
+      try {
+        await window.screen.orientation.lock("landscape");
+      } catch (error) {
+        console.debug("Landscape lock unavailable", error);
+      }
+    }
+  } catch (error) {
+    console.debug("Auto fullscreen unavailable", error);
+  }
 }
 
 function redraw() {
@@ -197,3 +242,12 @@ submitButton.addEventListener("click", async () => {
 window.addEventListener("resize", setupCanvas);
 setupCanvas();
 showStatus("请直接在签名框中手写签名。");
+loadSignConfig().catch((error) => {
+  console.error(error);
+  pledgeLine.textContent = "依法管水、科学配水、节水优先，守护右江灌区每一滴水";
+});
+window.addEventListener("load", () => {
+  window.setTimeout(() => {
+    requestSignFullscreen();
+  }, 120);
+}, { once: true });

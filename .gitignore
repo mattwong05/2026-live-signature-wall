@@ -10,3 +10,6 @@ build/
 dist/
 data/
 *.spec
+
+# Apple
+.DS_Store

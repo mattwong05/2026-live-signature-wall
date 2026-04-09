@@ -4,8 +4,10 @@ from contextlib import asynccontextmanager
 from io import BytesIO
 import sys
 import uuid
+import zipfile
 from pathlib import Path
 
+from PIL import Image, ImageDraw
 import qrcode
 import qrcode.image.svg
 import uvicorn
@@ -19,7 +21,9 @@ from .models import (
     BackgroundImageResponse,
     ClearSignaturesResponse,
     CompletionResponse,
+    EndSequenceResponse,
     HostIpPayload,
+    PledgeLinesPayload,
     ScreenState,
     ScreenTitlePayload,
     SignatureCreated,
@@ -69,6 +73,19 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 store = SignatureStore(DB_PATH)
 notifier = ScreenNotifier()
 
+NO_CACHE_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+class NoCacheStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope):  # type: ignore[override]
+        response = await super().get_response(path, scope)
+        response.headers.update(NO_CACHE_HEADERS)
+        return response
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     store.init_db()
@@ -76,8 +93,8 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Signature Wall", version="0.6.0", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+app = FastAPI(title="Signature Wall", version="0.9.2", lifespan=lifespan)
+app.mount("/static", NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
 
@@ -88,17 +105,17 @@ async def root() -> RedirectResponse:
 
 @app.get("/sign", include_in_schema=False)
 async def sign_page() -> FileResponse:
-    return FileResponse(TEMPLATES_DIR / "sign.html")
+    return FileResponse(TEMPLATES_DIR / "sign.html", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/admin", include_in_schema=False)
 async def admin_page() -> FileResponse:
-    return FileResponse(TEMPLATES_DIR / "admin.html")
+    return FileResponse(TEMPLATES_DIR / "admin.html", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/screen", include_in_schema=False)
 async def screen_page() -> FileResponse:
-    return FileResponse(TEMPLATES_DIR / "screen.html")
+    return FileResponse(TEMPLATES_DIR / "screen.html", headers=NO_CACHE_HEADERS)
 
 
 @app.get("/api/screen-state", response_model=ScreenState)
@@ -148,11 +165,18 @@ async def clear_background_image() -> BackgroundImageResponse:
 @app.get("/api/admin/config", response_model=AdminConfigResponse)
 async def get_admin_config() -> AdminConfigResponse:
     host_ip = store.get_host_ip()
-    return AdminConfigResponse(
+    response = AdminConfigResponse(
         background_image_url=store.get_background_image_url(),
         host_ip=host_ip,
         sign_page_url=build_sign_page_url(host_ip),
         screen_title=store.get_screen_title(),
+        pledge_lines=store.get_pledge_lines(),
+        signature_count=store.total_signature_count(),
+    )
+    return Response(
+        content=response.model_dump_json(),
+        media_type="application/json",
+        headers=NO_CACHE_HEADERS,
     )
 
 
@@ -164,6 +188,8 @@ async def update_host_ip(payload: HostIpPayload) -> AdminConfigResponse:
         host_ip=host_ip,
         sign_page_url=build_sign_page_url(host_ip),
         screen_title=store.get_screen_title(),
+        pledge_lines=store.get_pledge_lines(),
+        signature_count=store.total_signature_count(),
     )
 
 
@@ -182,7 +208,36 @@ async def update_screen_title(payload: ScreenTitlePayload) -> AdminConfigRespons
         host_ip=host_ip,
         sign_page_url=build_sign_page_url(host_ip),
         screen_title=screen_title,
+        pledge_lines=store.get_pledge_lines(),
+        signature_count=store.total_signature_count(),
     )
+
+
+@app.put("/api/admin/config/pledges", response_model=AdminConfigResponse)
+async def update_pledge_lines(payload: PledgeLinesPayload) -> AdminConfigResponse:
+    pledge_lines = store.set_pledge_lines(payload.pledge_lines)
+    await notifier.broadcast(
+        {
+            "type": "pledge_lines_updated",
+            "pledge_lines": pledge_lines,
+        }
+    )
+    host_ip = store.get_host_ip()
+    return AdminConfigResponse(
+        background_image_url=store.get_background_image_url(),
+        host_ip=host_ip,
+        sign_page_url=build_sign_page_url(host_ip),
+        screen_title=store.get_screen_title(),
+        pledge_lines=pledge_lines,
+        signature_count=store.total_signature_count(),
+    )
+
+
+@app.get("/api/sign-config")
+async def get_sign_config() -> dict[str, object]:
+    return {
+        "pledge_lines": store.get_pledge_lines(),
+    }
 
 
 @app.get("/api/admin/sign-qr.svg", include_in_schema=False)
@@ -203,6 +258,65 @@ async def clear_signatures() -> ClearSignaturesResponse:
     cleared = store.clear_signatures()
     await notifier.broadcast({"type": "signatures_cleared"})
     return ClearSignaturesResponse(cleared=cleared)
+
+
+@app.post("/api/admin/end-sequence", response_model=EndSequenceResponse)
+async def start_end_sequence() -> EndSequenceResponse:
+    await notifier.broadcast({"type": "ending_sequence_started"})
+    return EndSequenceResponse()
+
+
+def render_signature_png_bytes(signature: SignatureRecord) -> bytes:
+    image = Image.new("RGBA", (signature.canvas_width, signature.canvas_height), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    stroke_color = (31, 47, 68, 255)
+    stroke_width = 4
+
+    for stroke in signature.strokes:
+        if not stroke:
+            continue
+        if len(stroke) == 1:
+            point = stroke[0]
+            radius = 3
+            draw.ellipse(
+                (
+                    point.x - radius,
+                    point.y - radius,
+                    point.x + radius,
+                    point.y + radius,
+                ),
+                fill=stroke_color,
+            )
+            continue
+
+        points = [(point.x, point.y) for point in stroke]
+        draw.line(points, fill=stroke_color, width=stroke_width, joint="curve")
+
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+@app.get("/api/admin/signatures/export", include_in_schema=False)
+async def export_signatures() -> Response:
+    signatures = store.list_all_signatures()
+    if not signatures:
+        raise HTTPException(status_code=404, detail="No signatures to export.")
+
+    archive_buffer = BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for index, signature in enumerate(signatures, start=1):
+            file_name = f"{index:03d}_{signature.id}.png"
+            archive.writestr(file_name, render_signature_png_bytes(signature))
+
+    headers = {
+        "Content-Disposition": 'attachment; filename="signature-export.zip"',
+    }
+    return Response(
+        content=archive_buffer.getvalue(),
+        media_type="application/zip",
+        headers=headers,
+    )
 
 
 @app.get("/api/signatures/{signature_id}", response_model=SignatureRecord)

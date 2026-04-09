@@ -53,6 +53,11 @@ body {
   left: 48px;
   z-index: 3;
   pointer-events: none;
+  transition: opacity 320ms ease;
+}
+
+.overlay.sequence-hidden {
+  opacity: 0;
 }
 
 .eyebrow {

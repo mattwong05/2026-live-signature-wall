@@ -12,6 +12,9 @@
       <p class="eyebrow">Admin</p>
       <h1>大屏管理页</h1>
       <p class="subtitle">在这里维护大屏底图、局域网签名入口二维码，以及现场签名数据。</p>
+      <div class="top-actions">
+        <button id="endSequenceButton" type="button" class="danger-button top-danger-button">结束签名</button>
+      </div>
 
       <section class="admin-section">
         <h2>背景图</h2>
@@ -56,10 +59,23 @@
         </div>
       </section>
 
+      <section class="admin-section">
+        <h2>签名端宣誓文案列表</h2>
+        <label class="field">
+          <span>每行一条，签名端会随机展示其中 1 条</span>
+          <textarea id="pledgeLinesInput" rows="7" placeholder="每行输入一条宣誓文案"></textarea>
+        </label>
+        <div class="actions">
+          <button id="savePledgesButton" type="button" class="primary">保存宣誓文案列表</button>
+        </div>
+      </section>
+
       <section class="admin-section danger">
         <h2>签名数据</h2>
+        <p id="signatureCount" class="section-copy">当前签名数量：0</p>
         <p class="section-copy">清空后，待播放队列和历史背景签名都会立即移除。</p>
         <div class="actions">
+          <button id="exportSignaturesButton" type="button" class="secondary">导出签名</button>
           <button id="clearSignaturesButton" type="button" class="danger-button">清空全部签名</button>
         </div>
       </section>

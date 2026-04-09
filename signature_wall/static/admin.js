@@ -10,8 +10,16 @@ const signPageUrl = document.getElementById("signPageUrl");
 const qrPreview = document.getElementById("qrPreview");
 const qrEmptyState = document.getElementById("qrEmptyState");
 const clearSignaturesButton = document.getElementById("clearSignaturesButton");
+const exportSignaturesButton = document.getElementById("exportSignaturesButton");
 const screenTitleInput = document.getElementById("screenTitleInput");
 const saveTitleButton = document.getElementById("saveTitleButton");
+const pledgeLinesInput = document.getElementById("pledgeLinesInput");
+const savePledgesButton = document.getElementById("savePledgesButton");
+const signatureCount = document.getElementById("signatureCount");
+const endSequenceButton = document.getElementById("endSequenceButton");
+let refreshTimer = null;
+let adminSocket = null;
+let adminSocketRetryTimer = null;
 
 function showStatus(message, isError = false) {
   adminStatus.textContent = message;
@@ -30,8 +38,10 @@ function updatePreview(imageUrl) {
   }
 }
 
-async function loadBackground() {
-  const response = await fetch("/api/admin/config");
+async function loadAdminConfig() {
+  const response = await fetch("/api/admin/config", {
+    cache: "no-store",
+  });
   if (!response.ok) {
     throw new Error("Failed to load admin config");
   }
@@ -40,6 +50,60 @@ async function loadBackground() {
   hostIpInput.value = data.host_ip || "";
   updateQrState(data.sign_page_url);
   screenTitleInput.value = data.screen_title || "";
+  pledgeLinesInput.value = (data.pledge_lines || []).join("\n");
+  signatureCount.textContent = `当前签名数量：${data.signature_count || 0}`;
+}
+
+function scheduleRefresh(delay = 0) {
+  if (refreshTimer) {
+    window.clearTimeout(refreshTimer);
+  }
+  refreshTimer = window.setTimeout(() => {
+    loadAdminConfig().catch((error) => {
+      console.error(error);
+      showStatus("管理配置刷新失败。", true);
+    });
+  }, delay);
+}
+
+function connectAdminSocket() {
+  if (adminSocket) {
+    adminSocket.close();
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  adminSocket = new WebSocket(`${protocol}://${window.location.host}/ws/screen`);
+
+  adminSocket.addEventListener("message", (event) => {
+    try {
+      const payload = JSON.parse(event.data);
+      if (
+        payload.type === "signature_submitted" ||
+        payload.type === "signatures_cleared" ||
+        payload.type === "background_image_updated" ||
+        payload.type === "screen_title_updated" ||
+        payload.type === "pledge_lines_updated"
+      ) {
+        scheduleRefresh(0);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  });
+
+  adminSocket.addEventListener("close", () => {
+    adminSocket = null;
+    if (adminSocketRetryTimer) {
+      window.clearTimeout(adminSocketRetryTimer);
+    }
+    adminSocketRetryTimer = window.setTimeout(connectAdminSocket, 2000);
+  });
+
+  adminSocket.addEventListener("error", () => {
+    if (adminSocket) {
+      adminSocket.close();
+    }
+  });
 }
 
 function updateQrState(url) {
@@ -178,6 +242,42 @@ saveTitleButton.addEventListener("click", async () => {
   }
 });
 
+savePledgesButton.addEventListener("click", async () => {
+  const pledgeLines = pledgeLinesInput.value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!pledgeLines.length) {
+    showStatus("请至少保留一条宣誓文案。", true);
+    return;
+  }
+
+  savePledgesButton.disabled = true;
+  showStatus("正在保存宣誓文案列表...");
+
+  try {
+    const response = await fetch("/api/admin/config/pledges", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ pledge_lines: pledgeLines }),
+    });
+    if (!response.ok) {
+      throw new Error("Save pledges failed");
+    }
+    const data = await response.json();
+    pledgeLinesInput.value = (data.pledge_lines || []).join("\n");
+    showStatus("宣誓文案列表已更新。");
+  } catch (error) {
+    console.error(error);
+    showStatus("保存宣誓文案列表失败，请重试。", true);
+  } finally {
+    savePledgesButton.disabled = false;
+  }
+});
+
 clearSignaturesButton.addEventListener("click", async () => {
   const confirmed = window.confirm("确认清空全部签名吗？队列和背景签名都会立刻消失。");
   if (!confirmed) {
@@ -195,6 +295,7 @@ clearSignaturesButton.addEventListener("click", async () => {
       throw new Error("Clear signatures failed");
     }
     const data = await response.json();
+    signatureCount.textContent = "当前签名数量：0";
     showStatus(`已清空 ${data.cleared} 份签名。`);
   } catch (error) {
     console.error(error);
@@ -204,7 +305,75 @@ clearSignaturesButton.addEventListener("click", async () => {
   }
 });
 
-loadBackground().catch((error) => {
+exportSignaturesButton.addEventListener("click", async () => {
+  exportSignaturesButton.disabled = true;
+  showStatus("正在导出签名...");
+
+  try {
+    const response = await fetch("/api/admin/signatures/export");
+    if (!response.ok) {
+      throw new Error("Export signatures failed");
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "signature-export.zip";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showStatus("签名导出完成。");
+  } catch (error) {
+    console.error(error);
+    showStatus("导出签名失败，请确认当前存在可导出的签名。", true);
+  } finally {
+    exportSignaturesButton.disabled = false;
+  }
+});
+
+endSequenceButton.addEventListener("click", async () => {
+  const confirmed = window.confirm("确认结束签名吗？大屏将立刻播放收束爆发动画。");
+  if (!confirmed) {
+    return;
+  }
+
+  endSequenceButton.disabled = true;
+  showStatus("正在触发结束签名动画...");
+
+  try {
+    const response = await fetch("/api/admin/end-sequence", {
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error("End sequence failed");
+    }
+    showStatus("结束签名动画已发送到大屏。");
+  } catch (error) {
+    console.error(error);
+    showStatus("结束签名动画触发失败，请重试。", true);
+  } finally {
+    endSequenceButton.disabled = false;
+  }
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    scheduleRefresh(0);
+  }
+});
+
+window.addEventListener("focus", () => {
+  scheduleRefresh(0);
+});
+
+window.setInterval(() => {
+  scheduleRefresh(0);
+}, 15000);
+
+connectAdminSocket();
+
+loadAdminConfig().catch((error) => {
   console.error(error);
   showStatus("管理配置加载失败。", true);
 });

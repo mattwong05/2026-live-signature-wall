@@ -2,6 +2,7 @@ const backgroundCanvas = document.getElementById("backgroundCanvas");
 const playbackCanvas = document.getElementById("playbackCanvas");
 const screenHint = document.getElementById("screenHint");
 const screenTitle = document.getElementById("screenTitle");
+const screenOverlay = document.getElementById("screenOverlay");
 const backgroundImageLayer = document.getElementById("backgroundImageLayer");
 const fullscreenButton = document.getElementById("fullscreenButton");
 
@@ -12,6 +13,9 @@ let backgroundItems = [];
 let pendingQueue = [];
 let playing = false;
 let backgroundImageUrl = null;
+let currentPlaybackSignature = null;
+let playbackRunId = 0;
+let endingSequence = null;
 const BACKGROUND_PADDING = 24;
 const MAX_LAYOUT_ATTEMPTS = 80;
 
@@ -183,6 +187,33 @@ function createBackgroundItem(signature) {
   };
 }
 
+function buildEndingActor(signature, item = null) {
+  const actor = item || createBackgroundItem(signature);
+  return {
+    id: signature.id,
+    image: actor.image,
+    x: actor.x,
+    y: actor.y,
+    width: actor.width,
+    height: actor.height,
+    startX: actor.x,
+    startY: actor.y,
+    startWidth: actor.width,
+    startHeight: actor.height,
+    alpha: 1,
+  };
+}
+
+function uniqueSignatures(signatures) {
+  const byId = new Map();
+  signatures.forEach((signature) => {
+    if (signature && !byId.has(signature.id)) {
+      byId.set(signature.id, signature);
+    }
+  });
+  return Array.from(byId.values());
+}
+
 function ensureBackgroundSignature(signature) {
   if (backgroundItems.some((item) => item.id === signature.id)) {
     return;
@@ -315,7 +346,240 @@ function resolveItemCollisions(item, itemRect, index, idleMode) {
   }
 }
 
+function easeInOutCubic(value) {
+  if (value < 0.5) {
+    return 4 * value * value * value;
+  }
+  return 1 - ((-2 * value + 2) ** 3) / 2;
+}
+
+function easeInQuint(value) {
+  return value ** 5;
+}
+
+function easeInCubic(value) {
+  return value ** 3;
+}
+
+function easeOutQuart(value) {
+  return 1 - (1 - value) ** 4;
+}
+
+function mixedConvergeEase(value) {
+  return Math.min(1, value * 0.18 + easeInQuint(value) * 0.82);
+}
+
+function drawEnergyOrb(context, centerX, centerY, coreRadius, glowRadius, alpha) {
+  const gradient = context.createRadialGradient(
+    centerX,
+    centerY,
+    Math.max(1, coreRadius * 0.18),
+    centerX,
+    centerY,
+    glowRadius,
+  );
+  gradient.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha)})`);
+  gradient.addColorStop(0.28, `rgba(255, 255, 255, ${Math.min(1, alpha * 0.92)})`);
+  gradient.addColorStop(0.62, `rgba(255, 255, 255, ${Math.min(1, alpha * 0.28)})`);
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.arc(centerX, centerY, glowRadius, 0, Math.PI * 2);
+  context.fill();
+
+  context.fillStyle = `rgba(255, 255, 255, ${Math.min(1, alpha)})`;
+  context.beginPath();
+  context.arc(centerX, centerY, coreRadius, 0, Math.PI * 2);
+  context.fill();
+}
+
+function drawFlashWave(context, centerX, centerY, radius, alpha) {
+  const innerRadius = Math.max(1, radius * 0.34);
+  const gradient = context.createRadialGradient(
+    centerX,
+    centerY,
+    innerRadius,
+    centerX,
+    centerY,
+    radius,
+  );
+  gradient.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha * 0.08)})`);
+  gradient.addColorStop(0.55, `rgba(255, 255, 255, ${Math.min(1, alpha * 0.18)})`);
+  gradient.addColorStop(0.82, `rgba(255, 255, 255, ${Math.min(1, alpha)})`);
+  gradient.addColorStop(1, "rgba(255, 255, 255, 0)");
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  context.fill();
+}
+
+async function startEndingSequence() {
+  if (endingSequence) {
+    return;
+  }
+
+  playbackRunId += 1;
+  playing = false;
+  updateHint("");
+  screenOverlay.classList.add("sequence-hidden");
+
+  let state;
+  try {
+    state = await fetchScreenState();
+  } catch (error) {
+    console.error(error);
+    state = {
+      background_signatures: [],
+      pending_signatures: [],
+    };
+  }
+
+  const allSignatures = uniqueSignatures([
+    ...state.background_signatures,
+    ...state.pending_signatures,
+    ...pendingQueue,
+    currentPlaybackSignature,
+  ]);
+
+  const existingItems = new Map(backgroundItems.map((item) => [item.id, item]));
+  const actors = allSignatures.map((signature, index) => {
+    const existing = existingItems.get(signature.id);
+    const actor = buildEndingActor(signature, existing);
+    if (!existing) {
+      const orbitRadiusX = window.innerWidth * 0.22 + (index % 5) * 36;
+      const orbitRadiusY = window.innerHeight * 0.18 + (index % 7) * 24;
+      const angle = (Math.PI * 2 * index) / Math.max(allSignatures.length, 1);
+      actor.x = window.innerWidth / 2 + Math.cos(angle) * orbitRadiusX - actor.width / 2;
+      actor.y = window.innerHeight / 2 + Math.sin(angle) * orbitRadiusY - actor.height / 2;
+      actor.startX = actor.x;
+      actor.startY = actor.y;
+    }
+    return actor;
+  });
+
+  pendingQueue = [];
+  currentPlaybackSignature = null;
+  playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+  endingSequence = {
+    startedAt: performance.now(),
+    actors,
+    completed: false,
+  };
+}
+
+function drawEndingSequence(now) {
+  if (!endingSequence) {
+    return false;
+  }
+
+  const convergeDuration = 2800;
+  const fuseDuration = 1100;
+  const blastDuration = 1180;
+  const totalDuration = convergeDuration + fuseDuration + blastDuration;
+  const elapsed = now - endingSequence.startedAt;
+  const centerX = window.innerWidth / 2;
+  const centerY = window.innerHeight / 2;
+  const maxRadius = Math.hypot(window.innerWidth, window.innerHeight);
+
+  backgroundContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+  if (elapsed <= convergeDuration) {
+    const progress = mixedConvergeEase(Math.min(elapsed / convergeDuration, 1));
+    endingSequence.actors.forEach((actor) => {
+      const targetWidth = Math.max(10, actor.startWidth * 0.1);
+      const targetHeight = Math.max(8, actor.startHeight * 0.1);
+      const targetX = centerX - targetWidth / 2;
+      const targetY = centerY - targetHeight / 2;
+      const width = actor.startWidth + (targetWidth - actor.startWidth) * progress;
+      const height = actor.startHeight + (targetHeight - actor.startHeight) * progress;
+      const x = actor.startX + (targetX - actor.startX) * progress;
+      const y = actor.startY + (targetY - actor.startY) * progress;
+
+      backgroundContext.globalAlpha = 0.22 + (1 - progress) * 0.78;
+      backgroundContext.shadowBlur = 18 + progress * 24;
+      backgroundContext.shadowColor = "rgba(255, 252, 246, 0.56)";
+      backgroundContext.drawImage(actor.image, x, y, width, height);
+    });
+
+    const orbProgress = Math.max(0, (progress - 0.5) / 0.5);
+    const coreRadius = 0.4 + orbProgress * 8;
+    const glowRadius = 4 + orbProgress * 22;
+    playbackContext.globalCompositeOperation = "screen";
+    playbackContext.shadowBlur = 10 + orbProgress * 18;
+    playbackContext.shadowColor = "rgba(255, 255, 255, 0.78)";
+    if (orbProgress > 0) {
+      drawEnergyOrb(playbackContext, centerX, centerY, coreRadius, glowRadius, 0.28 + orbProgress * 0.62);
+    }
+    playbackContext.globalCompositeOperation = "source-over";
+  } else if (elapsed <= convergeDuration + fuseDuration) {
+    const progress = easeInOutCubic((elapsed - convergeDuration) / fuseDuration);
+
+    endingSequence.actors.forEach((actor, index) => {
+      const angle = (Math.PI * 2 * index) / Math.max(endingSequence.actors.length, 1);
+      const drift = (1 - progress) * 12;
+      const width = Math.max(5, actor.startWidth * (0.1 - progress * 0.06));
+      const height = Math.max(4, actor.startHeight * (0.1 - progress * 0.06));
+      const x = centerX - width / 2 + Math.cos(angle) * drift;
+      const y = centerY - height / 2 + Math.sin(angle) * drift;
+      backgroundContext.globalAlpha = (1 - progress) * 0.42;
+      backgroundContext.shadowBlur = 24;
+      backgroundContext.shadowColor = "rgba(255, 255, 255, 0.8)";
+      backgroundContext.drawImage(actor.image, x, y, width, height);
+    });
+
+    const coreRadius = 8 + progress * 10;
+    const glowRadius = 24 + progress * 18;
+    playbackContext.globalCompositeOperation = "screen";
+    playbackContext.shadowBlur = 34 + progress * 20;
+    playbackContext.shadowColor = "rgba(255, 255, 255, 0.98)";
+    drawEnergyOrb(playbackContext, centerX, centerY, coreRadius, glowRadius, 0.92 + progress * 0.08);
+    playbackContext.globalCompositeOperation = "source-over";
+  } else if (elapsed <= totalDuration) {
+    const phaseProgress = (elapsed - convergeDuration - fuseDuration) / blastDuration;
+    const progress = easeOutQuart(phaseProgress);
+    const ringProgress = easeInCubic(Math.min(1, phaseProgress * 1.06));
+    const flashRadius = ringProgress * maxRadius * 1.14;
+    const whiteAlpha = Math.min(1, 0.08 + progress * 0.92);
+
+    backgroundContext.fillStyle = `rgba(255, 255, 255, ${whiteAlpha})`;
+    backgroundContext.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+    playbackContext.globalCompositeOperation = "screen";
+    playbackContext.shadowBlur = 52 + progress * 24;
+    playbackContext.shadowColor = "rgba(255, 255, 255, 1)";
+    drawFlashWave(playbackContext, centerX, centerY, Math.max(12, flashRadius), 0.34 + progress * 0.56);
+    drawEnergyOrb(
+      playbackContext,
+      centerX,
+      centerY,
+      Math.max(4, 8 + progress * 18),
+      Math.max(18, 26 + flashRadius * 0.86),
+      Math.min(1, 0.72 + progress * 0.28),
+    );
+    playbackContext.globalCompositeOperation = "source-over";
+  } else {
+    backgroundContext.fillStyle = "#ffffff";
+    backgroundContext.fillRect(0, 0, window.innerWidth, window.innerHeight);
+    endingSequence.completed = true;
+  }
+
+  backgroundContext.globalAlpha = 1;
+  backgroundContext.shadowBlur = 0;
+  playbackContext.globalAlpha = 1;
+  playbackContext.shadowBlur = 0;
+
+  return true;
+}
+
 function animateBackground() {
+  if (drawEndingSequence(performance.now())) {
+    window.requestAnimationFrame(animateBackground);
+    return;
+  }
+
   backgroundContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
   const idleMode = isIdleMode();
 
@@ -382,7 +646,7 @@ async function markSignatureCompleted(signatureId) {
   return data.signature;
 }
 
-async function playSignature(signature) {
+async function playSignature(signature, runId) {
   const transform = buildTransform(signature, window.innerWidth, window.innerHeight, 0.5, 0.36);
   playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
   playbackContext.lineCap = "round";
@@ -395,6 +659,11 @@ async function playSignature(signature) {
 
   let previousTime = 0;
   for (const stroke of signature.strokes) {
+    if (runId !== playbackRunId || endingSequence) {
+      playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      return false;
+    }
+
     if (stroke.length === 0) {
       continue;
     }
@@ -402,6 +671,10 @@ async function playSignature(signature) {
     const firstPoint = stroke[0];
     if (firstPoint.t > previousTime) {
       await sleep(firstPoint.t - previousTime);
+      if (runId !== playbackRunId || endingSequence) {
+        playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        return false;
+      }
     }
 
     if (stroke.length === 1) {
@@ -422,6 +695,10 @@ async function playSignature(signature) {
       const wait = Math.max(0, point.t - previousTime);
       if (wait > 0) {
         await sleep(wait);
+        if (runId !== playbackRunId || endingSequence) {
+          playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+          return false;
+        }
       }
       playbackContext.lineTo(
         point.x * transform.scale + transform.translateX,
@@ -433,7 +710,12 @@ async function playSignature(signature) {
   }
 
   await sleep(650);
+  if (runId !== playbackRunId || endingSequence) {
+    playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    return false;
+  }
   playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  return true;
 }
 
 function enqueueSignature(signature) {
@@ -444,6 +726,10 @@ function enqueueSignature(signature) {
 }
 
 async function playNextIfNeeded() {
+  if (endingSequence) {
+    return;
+  }
+
   if (playing || pendingQueue.length === 0) {
     if (!playing && pendingQueue.length === 0 && backgroundItems.length === 0) {
       updateHint("等待第一位来宾落笔");
@@ -455,8 +741,13 @@ async function playNextIfNeeded() {
 
   while (pendingQueue.length > 0) {
     const current = pendingQueue.shift();
+    const runId = ++playbackRunId;
+    currentPlaybackSignature = current;
     updateHint("");
-    await playSignature(current);
+    const completedPlayback = await playSignature(current, runId);
+    if (!completedPlayback || endingSequence || runId !== playbackRunId) {
+      break;
+    }
     try {
       const completedSignature = await markSignatureCompleted(current.id);
       ensureBackgroundSignature(completedSignature);
@@ -469,7 +760,11 @@ async function playNextIfNeeded() {
     }
   }
 
+  currentPlaybackSignature = null;
   playing = false;
+  if (endingSequence) {
+    return;
+  }
   if (backgroundItems.length > 0) {
     updateHint("");
   } else {
@@ -483,6 +778,11 @@ function connectWebSocket() {
 
   socket.addEventListener("message", async (event) => {
     const payload = JSON.parse(event.data);
+    if (payload.type === "ending_sequence_started") {
+      await startEndingSequence();
+      return;
+    }
+
     if (payload.type === "background_image_updated") {
       updateBackgroundImage(payload.background_image_url);
       return;
@@ -494,15 +794,19 @@ function connectWebSocket() {
     }
 
     if (payload.type === "signatures_cleared") {
+      endingSequence = null;
+      playbackRunId += 1;
       pendingQueue = [];
       backgroundItems = [];
+      currentPlaybackSignature = null;
+      screenOverlay.classList.remove("sequence-hidden");
       playbackContext.clearRect(0, 0, window.innerWidth, window.innerHeight);
       updateHint("签名已清空，等待新的来宾落笔");
       playing = false;
       return;
     }
 
-    if (payload.type !== "signature_submitted") {
+    if (payload.type !== "signature_submitted" || endingSequence) {
       return;
     }
 
@@ -579,7 +883,9 @@ document.addEventListener("fullscreenchange", () => {
 
 window.addEventListener("resize", () => {
   setupCanvases();
-  relayoutBackgroundItems();
+  if (!endingSequence) {
+    relayoutBackgroundItems();
+  }
 });
 
 bootstrap();
