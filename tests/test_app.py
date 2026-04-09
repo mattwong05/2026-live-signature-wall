@@ -234,3 +234,17 @@ def test_run_opens_admin_and_screen_pages_before_starting_server() -> None:
 
         open_pages.assert_called_once_with("http://127.0.0.1:8000")
         uvicorn_run.assert_called_once()
+
+
+def test_run_disables_default_uvicorn_logging_when_no_tty_stream_exists() -> None:
+    with patch("signature_wall.main.should_open_browser", return_value=False), \
+        patch("signature_wall.main.uvicorn.run") as uvicorn_run, \
+        patch("signature_wall.main.sys.stderr", None), \
+        patch("signature_wall.main.sys.stdout", None):
+        from signature_wall.main import run
+
+        run()
+
+        _, kwargs = uvicorn_run.call_args
+        assert kwargs["log_config"] is None
+        assert kwargs["log_level"] == "info"

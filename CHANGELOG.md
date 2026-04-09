@@ -18,6 +18,20 @@ The format is based on Keep a Changelog.
 ### Removed
 - None.
 
+## [0.12.3] - 2026-04-09
+
+### Added
+- 新增窗口化 `.exe` 启动场景下的日志配置回归测试。
+
+### Changed
+- 启动入口会在没有可用终端流时禁用 `uvicorn` 默认彩色日志配置，并回退到基础日志初始化。
+
+### Fixed
+- 修复 Windows `--windowed` 打包产物启动时，`uvicorn` 默认 formatter 访问空终端流导致程序直接崩溃的问题。
+
+### Removed
+- None.
+
 ## [0.12.2] - 2026-04-09
 
 ### Added

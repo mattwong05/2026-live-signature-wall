@@ -34,4 +34,5 @@
 - 项目提供 GitHub Actions Windows 自动构建工作流
 - 测试需要显式关闭 `TestClient`，且 sqlite 存储访问必须在每次操作后关闭连接，以兼容 Windows 文件锁
 - 打包目标为 Windows 文件夹版 `dist/signature-wall/`，其中包含 `signature-wall.exe`
+- Windows `--windowed` 启动入口不得依赖 `uvicorn` 默认终端日志 formatter
 - 如果未来增加自动化构建，应围绕 PyInstaller 与静态资源打包流程扩展

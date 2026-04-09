@@ -9,6 +9,7 @@ import time
 import uuid
 import zipfile
 import webbrowser
+import logging
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -85,6 +86,17 @@ def open_startup_pages(base_url: str, delay_seconds: float = 1.2) -> None:
     threading.Thread(target=worker, daemon=True).start()
 
 
+def should_use_default_uvicorn_logging() -> bool:
+    stream = getattr(sys, "stderr", None) or getattr(sys, "stdout", None)
+    return stream is not None and hasattr(stream, "isatty")
+
+
+def configure_windowed_logging() -> None:
+    if logging.getLogger().handlers:
+        return
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+
+
 RUNTIME_ROOT = _runtime_root()
 RESOURCE_ROOT = _resource_root()
 STATIC_DIR = RESOURCE_ROOT / "static"
@@ -117,7 +129,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Signature Wall", version="0.12.2", lifespan=lifespan)
+app = FastAPI(title="Signature Wall", version="0.12.3", lifespan=lifespan)
 app.mount("/static", NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
@@ -401,4 +413,12 @@ def run() -> None:
     print(f"Signature wall running on {base_url}")
     if should_open_browser():
         open_startup_pages(base_url)
-    uvicorn.run(app, host=HOST, port=PORT, log_level="info")
+    uvicorn_options = {
+        "host": HOST,
+        "port": PORT,
+        "log_level": "info",
+    }
+    if not should_use_default_uvicorn_logging():
+        configure_windowed_logging()
+        uvicorn_options["log_config"] = None
+    uvicorn.run(app, **uvicorn_options)

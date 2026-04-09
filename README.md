@@ -12,6 +12,7 @@
 - `/admin`：管理页顶部可触发“结束签名”动画，让大屏中的所有签名向中心汇聚并白光爆发收场
 - Windows 打包产物改为文件夹形式，主程序为 `signature-wall.exe`
 - 启动 Windows `.exe` 后，会自动打开 `/admin` 和 `/screen`
+- Windows `--windowed` 打包产物会自动回退到兼容的基础日志配置，避免无控制台环境启动崩溃
 - 使用 `SQLite` 持久保存完整签名轨迹与后台配置
 - 使用 `WebSocket` 向大屏实时通知新签名提交和后台配置变更
 - 支持打包为 Windows `.exe`

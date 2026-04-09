@@ -50,3 +50,4 @@
 - 启动程序后会自动打开本机 `/admin` 和 `/screen`
 - GitHub Actions 工作流会在 Windows runner 上测试并构建该目录产物
 - 测试层需要在每个用例结束后显式关闭 `TestClient` 并恢复临时 sqlite 路径；存储层也必须在每次查询后关闭 sqlite 连接，避免 Windows 文件锁残留
+- 启动层在窗口化 `.exe` 环境下会禁用 `uvicorn` 默认终端日志 formatter，避免 `isatty()` 访问空流时报错
