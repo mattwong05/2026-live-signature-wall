@@ -20,7 +20,7 @@
 - 结束签名动画已支持在汇聚过程中重播各个签名笔迹
 - 支持 GitHub Actions 自动构建 Windows 文件夹版 `.exe`
 - Windows 启动后自动打开管理页与大屏页
-- Windows CI 测试已处理 sqlite 临时文件释放，避免构建前测试阶段失败
+- Windows CI 测试已处理 `TestClient` 与 sqlite 连接释放，避免构建前测试阶段失败
 - 支持 Windows `.exe` 打包
 
 ## Next

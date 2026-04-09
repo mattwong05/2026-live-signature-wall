@@ -117,7 +117,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Signature Wall", version="0.12.1", lifespan=lifespan)
+app = FastAPI(title="Signature Wall", version="0.12.2", lifespan=lifespan)
 app.mount("/static", NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 

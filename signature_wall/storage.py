@@ -5,6 +5,7 @@ import os
 import sqlite3
 import time
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 from .models import BackgroundImageResponse, Point, ScreenState, SignaturePayload, SignatureRecord
@@ -20,7 +21,7 @@ class SignatureStore:
 
     def init_db(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS signatures (
@@ -52,7 +53,7 @@ class SignatureStore:
             ensure_ascii=False,
         )
 
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 """
                 INSERT INTO signatures (
@@ -79,7 +80,7 @@ class SignatureStore:
         )
 
     def get_signature(self, signature_id: str) -> SignatureRecord | None:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute(
                 """
                 SELECT id, created_at, canvas_width, canvas_height, strokes_json
@@ -92,14 +93,14 @@ class SignatureStore:
         return self._row_to_record(row) if row else None
 
     def pending_count(self) -> int:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute(
                 "SELECT COUNT(*) AS count FROM signatures WHERE status = 'pending'"
             ).fetchone()
         return int(row["count"])
 
     def get_screen_state(self) -> ScreenState:
-        with self._connect() as conn:
+        with self._connection() as conn:
             background_rows = conn.execute(
                 """
                 SELECT id, created_at, canvas_width, canvas_height, strokes_json
@@ -124,7 +125,7 @@ class SignatureStore:
         )
 
     def complete_signature(self, signature_id: str) -> SignatureRecord:
-        with self._connect() as conn:
+        with self._connection() as conn:
             first_pending = conn.execute(
                 """
                 SELECT id
@@ -168,8 +169,16 @@ class SignatureStore:
         conn.row_factory = sqlite3.Row
         return conn
 
+    @contextmanager
+    def _connection(self):
+        conn = self._connect()
+        try:
+            yield conn
+        finally:
+            conn.close()
+
     def get_background_image_url(self) -> str | None:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute(
                 """
                 SELECT value
@@ -183,7 +192,7 @@ class SignatureStore:
 
     def set_background_image_url(self, image_url: str) -> BackgroundImageResponse:
         previous = self.get_background_image_url()
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 """
                 INSERT INTO settings (key, value)
@@ -199,14 +208,14 @@ class SignatureStore:
 
     def clear_background_image_url(self) -> BackgroundImageResponse:
         previous = self.get_background_image_url()
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute("DELETE FROM settings WHERE key = 'background_image_url'")
             conn.commit()
         self._delete_previous_background_file(previous, None)
         return BackgroundImageResponse(background_image_url=None)
 
     def get_host_ip(self) -> str | None:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute(
                 """
                 SELECT value
@@ -220,7 +229,7 @@ class SignatureStore:
 
     def set_host_ip(self, host_ip: str) -> str:
         normalized = host_ip.strip()
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 """
                 INSERT INTO settings (key, value)
@@ -233,19 +242,19 @@ class SignatureStore:
         return normalized
 
     def clear_signatures(self) -> int:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute("SELECT COUNT(*) AS count FROM signatures").fetchone()
             conn.execute("DELETE FROM signatures")
             conn.commit()
         return int(row["count"])
 
     def total_signature_count(self) -> int:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute("SELECT COUNT(*) AS count FROM signatures").fetchone()
         return int(row["count"])
 
     def list_all_signatures(self) -> list[SignatureRecord]:
-        with self._connect() as conn:
+        with self._connection() as conn:
             rows = conn.execute(
                 """
                 SELECT id, created_at, canvas_width, canvas_height, strokes_json
@@ -256,7 +265,7 @@ class SignatureStore:
         return [self._row_to_record(row) for row in rows]
 
     def get_screen_title(self) -> str:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute(
                 """
                 SELECT value
@@ -270,7 +279,7 @@ class SignatureStore:
 
     def set_screen_title(self, screen_title: str) -> str:
         normalized = screen_title.strip()
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 """
                 INSERT INTO settings (key, value)
@@ -283,7 +292,7 @@ class SignatureStore:
         return normalized
 
     def get_pledge_lines(self) -> list[str]:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row = conn.execute(
                 """
                 SELECT value
@@ -301,7 +310,7 @@ class SignatureStore:
 
     def set_pledge_lines(self, pledge_lines: list[str]) -> list[str]:
         normalized = [line.strip() for line in pledge_lines if line.strip()]
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 """
                 INSERT INTO settings (key, value)

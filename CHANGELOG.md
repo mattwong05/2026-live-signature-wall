@@ -18,6 +18,20 @@ The format is based on Keep a Changelog.
 ### Removed
 - None.
 
+## [0.12.2] - 2026-04-09
+
+### Added
+- None.
+
+### Changed
+- sqlite 存储层改为使用显式关闭连接的上下文，确保每次数据库访问结束后立即释放文件句柄。
+
+### Fixed
+- 修复 GitHub Actions Windows 环境中，即使测试已关闭 `TestClient`，sqlite 临时数据库文件仍可能被连接句柄占用的问题。
+
+### Removed
+- None.
+
 ## [0.12.1] - 2026-04-09
 
 ### Added

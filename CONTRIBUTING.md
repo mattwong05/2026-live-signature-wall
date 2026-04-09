@@ -19,7 +19,7 @@
 - 调整旋转签名浮层时，确认背景卡片能完整包裹工作区，不出现边缘溢出
 - 调整结束签名动画时，确认汇聚阶段的笔迹重播能在消失前完成
 - 调整启动逻辑时，确认桌面启动后会自动打开 `/admin` 和 `/screen`，并支持 `SIGNATURE_WALL_NO_BROWSER=1`
-- 调整测试时，确认 `TestClient` 生命周期和临时 sqlite 文件在 Windows 上会被正确释放
+- 调整测试或存储层时，确认 `TestClient` 生命周期与 sqlite 连接都会在 Windows 上被正确释放
 - 修改功能后同步更新版本与文档
 
 ## Release Process
