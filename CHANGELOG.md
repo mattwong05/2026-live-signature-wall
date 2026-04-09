@@ -18,6 +18,20 @@ The format is based on Keep a Changelog.
 ### Removed
 - None.
 
+## [0.12.1] - 2026-04-09
+
+### Added
+- None.
+
+### Changed
+- 测试改为显式管理 `TestClient` 生命周期，并在用例结束后恢复临时应用路径覆盖。
+
+### Fixed
+- 修复 GitHub Actions Windows 环境中 sqlite 临时数据库文件被占用，导致测试结束后无法清理目录的问题。
+
+### Removed
+- None.
+
 ## [0.12.0] - 2026-04-09
 
 ### Added

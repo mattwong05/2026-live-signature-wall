@@ -180,6 +180,7 @@ SIGNATURE_WALL_NO_BROWSER=1
 - 运行测试
 - 执行 `build_windows.bat`
 - 上传 `dist/signature-wall/` 作为 artifact
+- 测试已显式关闭 `TestClient` 并恢复临时数据库路径，避免 Windows 上的 sqlite 文件占用导致构建失败
 
 ## 注意事项
 
