@@ -191,6 +191,8 @@ function buildEndingActor(signature, item = null) {
   const actor = item || createBackgroundItem(signature);
   return {
     id: signature.id,
+    signature,
+    signatureDuration: maxSignatureTime(signature),
     image: actor.image,
     x: actor.x,
     y: actor.y,
@@ -212,6 +214,85 @@ function uniqueSignatures(signatures) {
     }
   });
   return Array.from(byId.values());
+}
+
+function maxSignatureTime(signature) {
+  let maxTime = 0;
+  signature.strokes.forEach((stroke) => {
+    stroke.forEach((point) => {
+      maxTime = Math.max(maxTime, point.t);
+    });
+  });
+  return Math.max(1, maxTime);
+}
+
+function drawStrokeProgress(context, stroke, transform, threshold, pointRadius) {
+  if (!stroke.length || threshold < stroke[0].t) {
+    return;
+  }
+
+  if (stroke.length === 1) {
+    drawStrokePoint(context, stroke[0], transform, pointRadius);
+    return;
+  }
+
+  if (threshold < stroke[1].t) {
+    drawStrokePoint(context, stroke[0], transform, pointRadius);
+    return;
+  }
+
+  context.beginPath();
+  context.moveTo(
+    stroke[0].x * transform.scale + transform.translateX,
+    stroke[0].y * transform.scale + transform.translateY,
+  );
+
+  for (let index = 1; index < stroke.length; index += 1) {
+    const previous = stroke[index - 1];
+    const point = stroke[index];
+    if (threshold >= point.t) {
+      context.lineTo(
+        point.x * transform.scale + transform.translateX,
+        point.y * transform.scale + transform.translateY,
+      );
+      continue;
+    }
+
+    const span = Math.max(1, point.t - previous.t);
+    const ratio = Math.min(1, Math.max(0, (threshold - previous.t) / span));
+    const x = previous.x + (point.x - previous.x) * ratio;
+    const y = previous.y + (point.y - previous.y) * ratio;
+    context.lineTo(
+      x * transform.scale + transform.translateX,
+      y * transform.scale + transform.translateY,
+    );
+    break;
+  }
+
+  context.stroke();
+}
+
+function drawSignatureProgress(context, signature, signatureDuration, rect, progress, alpha) {
+  const bounds = boundsForSignature(signature);
+  const transform = buildTightTransform(bounds, rect.width, rect.height, 10);
+  transform.translateX += rect.x;
+  transform.translateY += rect.y;
+
+  context.save();
+  context.globalAlpha = alpha;
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.lineWidth = Math.max(1.8, Math.min(rect.width, rect.height) * 0.018);
+  context.strokeStyle = "rgba(255, 248, 236, 0.94)";
+  context.fillStyle = "rgba(255, 248, 236, 0.94)";
+  context.shadowBlur = 18;
+  context.shadowColor = "rgba(255, 250, 242, 0.58)";
+
+  const threshold = signatureDuration * Math.min(1, Math.max(0, progress));
+  signature.strokes.forEach((stroke) => {
+    drawStrokeProgress(context, stroke, transform, threshold, Math.max(1.4, context.lineWidth * 0.52));
+  });
+  context.restore();
 }
 
 function ensureBackgroundSignature(signature) {
@@ -488,6 +569,7 @@ function drawEndingSequence(now) {
 
   if (elapsed <= convergeDuration) {
     const progress = mixedConvergeEase(Math.min(elapsed / convergeDuration, 1));
+    const replayProgress = easeOutQuart(Math.min(1, elapsed / (convergeDuration * 0.78)));
     endingSequence.actors.forEach((actor) => {
       const targetWidth = Math.max(10, actor.startWidth * 0.1);
       const targetHeight = Math.max(8, actor.startHeight * 0.1);
@@ -498,10 +580,14 @@ function drawEndingSequence(now) {
       const x = actor.startX + (targetX - actor.startX) * progress;
       const y = actor.startY + (targetY - actor.startY) * progress;
 
-      backgroundContext.globalAlpha = 0.22 + (1 - progress) * 0.78;
-      backgroundContext.shadowBlur = 18 + progress * 24;
-      backgroundContext.shadowColor = "rgba(255, 252, 246, 0.56)";
-      backgroundContext.drawImage(actor.image, x, y, width, height);
+      drawSignatureProgress(
+        backgroundContext,
+        actor.signature,
+        actor.signatureDuration,
+        { x, y, width, height },
+        replayProgress,
+        0.28 + (1 - progress) * 0.72,
+      );
     });
 
     const orbProgress = Math.max(0, (progress - 0.5) / 0.5);

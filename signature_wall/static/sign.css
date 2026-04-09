@@ -9,6 +9,10 @@
   box-sizing: border-box;
 }
 
+.hidden {
+  display: none;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -21,6 +25,10 @@ body {
     radial-gradient(circle at top left, rgba(212, 162, 92, 0.28), transparent 34%),
     radial-gradient(circle at bottom right, rgba(33, 87, 135, 0.16), transparent 42%),
     linear-gradient(135deg, #fbf8f2 0%, #f0ebe1 100%);
+}
+
+body.overlay-active {
+  overflow: hidden;
 }
 
 .sign-shell {
@@ -71,6 +79,12 @@ h1 {
   border: 1px solid rgba(25, 35, 47, 0.08);
   background: linear-gradient(180deg, #fffdf9 0%, #f6f1e7 100%);
   touch-action: none;
+}
+
+.canvas-hint {
+  margin: 12px 4px 0;
+  font-size: 14px;
+  color: #58697b;
 }
 
 #signatureCanvas {
@@ -136,6 +150,112 @@ button:disabled {
   color: #236c47;
 }
 
+.sign-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(9, 18, 28, 0.84);
+  backdrop-filter: blur(12px);
+}
+
+.sign-overlay.hidden {
+  display: none;
+}
+
+.sign-overlay-panel {
+  width: min(100%, 1100px);
+  min-height: min(92dvh, 860px);
+  border-radius: 28px;
+  padding: 18px;
+  background: rgba(255, 252, 247, 0.98);
+  border: 1px solid rgba(25, 35, 47, 0.08);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.32);
+  overflow: hidden;
+}
+
+.sign-overlay-rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  width: 74px;
+  flex: 0 0 74px;
+  align-items: center;
+}
+
+.overlay-eyebrow {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7d5f38;
+}
+
+.vertical-text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  margin: 0 auto;
+}
+
+.overlay-close {
+  padding: 9px 14px;
+  background: #ece2d2;
+  color: #5d4b36;
+  box-shadow: none;
+  font-size: 13px;
+}
+
+.sign-overlay-stage {
+  position: relative;
+  height: min(88dvh, 820px);
+}
+
+.sign-overlay-rotated {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--expanded-workbench-width, min(86dvh, 900px));
+  height: var(--expanded-workbench-height, min(86vw, 420px));
+  transform: translate(-50%, -50%) rotate(90deg);
+  transform-origin: center;
+}
+
+.rotated-workbench {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+}
+
+.sign-overlay-frame {
+  flex: 1 1 auto;
+  height: 100%;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(25, 35, 47, 0.08);
+  background: linear-gradient(180deg, #fffdf9 0%, #f6f1e7 100%);
+}
+
+#expandedSignatureCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.overlay-mini {
+  padding: 9px 12px;
+  font-size: 13px;
+  min-width: 0;
+  width: 100%;
+}
 
 @media (max-width: 640px) {
   .sign-card {
@@ -152,5 +272,27 @@ button:disabled {
 
   button {
     flex: 1 1 0;
+  }
+
+  .sign-overlay {
+    padding: 12px;
+  }
+
+  .sign-overlay-panel {
+    min-height: min(94dvh, 900px);
+    padding: 12px;
+    border-radius: 22px;
+  }
+
+  .sign-overlay-rail {
+    width: 62px;
+    flex-basis: 62px;
+    gap: 8px;
+  }
+
+  .overlay-close,
+  .overlay-mini {
+    font-size: 12px;
+    padding: 8px 10px;
   }
 }

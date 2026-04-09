@@ -16,6 +16,7 @@
       <div class="canvas-frame">
         <canvas id="signatureCanvas"></canvas>
       </div>
+      <p id="phoneSigningHint" class="canvas-hint hidden">手机端点击签名框，可进入宽屏签名模式。</p>
 
       <div class="actions">
         <button id="resetButton" type="button" class="secondary">重置</button>
@@ -25,6 +26,26 @@
       <p id="statusMessage" class="status" aria-live="polite"></p>
     </section>
   </main>
+
+  <div id="expandedSigningOverlay" class="sign-overlay hidden" aria-hidden="true">
+    <section class="sign-overlay-panel">
+      <div class="sign-overlay-stage">
+        <div class="sign-overlay-rotated">
+          <div class="rotated-workbench">
+            <div class="sign-overlay-frame">
+              <canvas id="expandedSignatureCanvas"></canvas>
+            </div>
+            <div class="sign-overlay-rail">
+              <p class="overlay-eyebrow vertical-text">宽屏签名</p>
+              <button id="expandedCloseButton" type="button" class="overlay-close">返回</button>
+              <button id="expandedResetButton" type="button" class="secondary overlay-mini">重置</button>
+              <button id="expandedSubmitButton" type="button" class="primary overlay-mini">提交</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
 
   <script src="/static/sign.js" defer></script>
 </body>
