@@ -29,5 +29,8 @@
 - 宽屏签名浮层的画布尺寸按当前视口动态计算，优先铺满可用高度
 - 宽屏签名浮层的背景卡片需要完整包裹旋转工作区，避免边缘露出
 - 结束签名动画的汇聚阶段会重播签名笔迹，必要时自动加速
+- Windows 打包默认输出 `dist/signature-wall/` 文件夹，并包含 `signature-wall.exe`
+- 启动本地程序时默认自动打开 `/admin` 和 `/screen`，可通过环境变量关闭
+- 项目提供 GitHub Actions Windows 自动构建工作流
 - 打包目标为 Windows 单文件 `.exe`
 - 如果未来增加自动化构建，应围绕 PyInstaller 与静态资源打包流程扩展

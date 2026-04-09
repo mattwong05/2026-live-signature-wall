@@ -43,6 +43,9 @@
 
 ## Packaging
 
-- 使用 PyInstaller 打包为单文件可执行程序
+- 使用 PyInstaller 打包为文件夹版 Windows 可执行程序
 - 需要把 `signature_wall/static` 和 `signature_wall/templates` 一并带入产物
-- Windows 环境产物为 `dist/signature-wall.exe`
+- Windows 环境产物为 `dist/signature-wall/`
+- 主程序为 `dist/signature-wall/signature-wall.exe`
+- 启动程序后会自动打开本机 `/admin` 和 `/screen`
+- GitHub Actions 工作流会在 Windows runner 上测试并构建该目录产物

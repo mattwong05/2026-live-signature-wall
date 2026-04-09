@@ -18,6 +18,22 @@ The format is based on Keep a Changelog.
 ### Removed
 - None.
 
+## [0.12.0] - 2026-04-09
+
+### Added
+- 新增 GitHub Actions Windows 构建工作流。
+- Windows 程序启动后会自动打开 `/admin` 和 `/screen`。
+
+### Changed
+- Windows 打包从单文件 `.exe` 改为文件夹版 `dist/signature-wall/` 产物。
+- 打包脚本改为生成目录版可执行程序，并在构建前清理旧的 `build/` 与 `dist/`。
+
+### Fixed
+- None.
+
+### Removed
+- None.
+
 ## [0.11.0] - 2026-04-09
 
 ### Added

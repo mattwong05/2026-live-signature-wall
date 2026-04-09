@@ -10,6 +10,8 @@
 - `/admin`：管理页，可设置本机 IP、生成签名页二维码、上传背景图、清空签名、编辑大屏标题、维护宣誓文案列表
 - `/admin`：管理页还可显示签名数量，并将所有签名导出为透明背景 PNG 压缩包
 - `/admin`：管理页顶部可触发“结束签名”动画，让大屏中的所有签名向中心汇聚并白光爆发收场
+- Windows 打包产物改为文件夹形式，主程序为 `signature-wall.exe`
+- 启动 Windows `.exe` 后，会自动打开 `/admin` 和 `/screen`
 - 使用 `SQLite` 持久保存完整签名轨迹与后台配置
 - 使用 `WebSocket` 向大屏实时通知新签名提交和后台配置变更
 - 支持打包为 Windows `.exe`
@@ -135,10 +137,16 @@ uv run pytest -q
 build_windows.bat
 ```
 
-生成文件默认位于：
+生成文件夹默认位于：
 
 ```text
-dist\signature-wall.exe
+dist\signature-wall\
+```
+
+主程序位于：
+
+```text
+dist\signature-wall\signature-wall.exe
 ```
 
 运行后默认监听：
@@ -146,6 +154,32 @@ dist\signature-wall.exe
 ```text
 0.0.0.0:8000
 ```
+
+启动 `.exe` 后，默认会自动打开：
+
+```text
+http://127.0.0.1:8000/admin
+http://127.0.0.1:8000/screen
+```
+
+如果不希望自动打开浏览器，可设置环境变量：
+
+```text
+SIGNATURE_WALL_NO_BROWSER=1
+```
+
+## GitHub Actions
+
+项目已提供 Windows 自动构建工作流：
+
+- [windows-build.yml](/Users/matt_wong/Desktop/Processing/2026-大屏/.github/workflows/windows-build.yml)
+
+工作流会：
+
+- 在 Windows runner 上安装依赖
+- 运行测试
+- 执行 `build_windows.bat`
+- 上传 `dist/signature-wall/` 作为 artifact
 
 ## 注意事项
 

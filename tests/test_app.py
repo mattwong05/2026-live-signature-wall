@@ -4,6 +4,7 @@ import io
 import tempfile
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -255,3 +256,15 @@ def test_admin_end_sequence_broadcasts_websocket_event() -> None:
 
             payload = websocket.receive_json()
             assert payload["type"] == "ending_sequence_started"
+
+
+def test_run_opens_admin_and_screen_pages_before_starting_server() -> None:
+    with patch("signature_wall.main.should_open_browser", return_value=True), \
+        patch("signature_wall.main.open_startup_pages") as open_pages, \
+        patch("signature_wall.main.uvicorn.run") as uvicorn_run:
+        from signature_wall.main import run
+
+        run()
+
+        open_pages.assert_called_once_with("http://127.0.0.1:8000")
+        uvicorn_run.assert_called_once()

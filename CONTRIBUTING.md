@@ -18,6 +18,7 @@
 - 调整宽屏签名浮层布局时，确认签名框会优先铺满当前视口可用高度
 - 调整旋转签名浮层时，确认背景卡片能完整包裹工作区，不出现边缘溢出
 - 调整结束签名动画时，确认汇聚阶段的笔迹重播能在消失前完成
+- 调整启动逻辑时，确认桌面启动后会自动打开 `/admin` 和 `/screen`，并支持 `SIGNATURE_WALL_NO_BROWSER=1`
 - 修改功能后同步更新版本与文档
 
 ## Release Process
@@ -26,7 +27,8 @@
 2. 更新 `CHANGELOG.md`
 3. 确认 `README.md` 与实际行为一致
 4. 运行 `uv run pytest -q`
-5. 在 Windows 环境执行 `build_windows.bat` 生成 `.exe`
+5. 在 Windows 环境执行 `build_windows.bat` 生成 `dist/signature-wall/`
+6. 或通过 GitHub Actions 工作流自动构建并下载 artifact
 
 ## Commit Convention
 

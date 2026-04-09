@@ -3,7 +3,10 @@ setlocal
 
 py -m pip install --upgrade pip
 py -m pip install .[build]
-pyinstaller --onefile --name signature-wall ^
+if exist build rmdir /s /q build
+if exist dist rmdir /s /q dist
+
+pyinstaller --onedir --windowed --name signature-wall ^
   --hidden-import=uvicorn.logging ^
   --hidden-import=uvicorn.loops.auto ^
   --hidden-import=uvicorn.protocols.http.auto ^
@@ -14,5 +17,6 @@ pyinstaller --onefile --name signature-wall ^
   app.py
 
 echo.
-echo Build completed. Output: dist\signature-wall.exe
+echo Build completed. Output folder: dist\signature-wall\
+echo Main executable: dist\signature-wall\signature-wall.exe
 endlocal

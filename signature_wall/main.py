@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from io import BytesIO
+import os
 import sys
+import threading
+import time
 import uuid
 import zipfile
+import webbrowser
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -36,6 +40,7 @@ from .storage import QueueOrderError, SignatureStore
 
 HOST = "0.0.0.0"
 PORT = 8000
+DEFAULT_LAUNCH_URLS = ("/admin", "/screen")
 ALLOWED_BACKGROUND_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -59,6 +64,25 @@ def _resource_root() -> Path:
     if getattr(sys, "frozen", False):
         return Path(getattr(sys, "_MEIPASS")) / "signature_wall"
     return Path(__file__).resolve().parent
+
+
+def should_open_browser() -> bool:
+    disabled = os.environ.get("SIGNATURE_WALL_NO_BROWSER", "").strip().lower()
+    if disabled in {"1", "true", "yes", "on"}:
+        return False
+    return True
+
+
+def open_startup_pages(base_url: str, delay_seconds: float = 1.2) -> None:
+    def worker() -> None:
+        time.sleep(delay_seconds)
+        for path in DEFAULT_LAUNCH_URLS:
+            try:
+                webbrowser.open(f"{base_url}{path}")
+            except Exception:
+                continue
+
+    threading.Thread(target=worker, daemon=True).start()
 
 
 RUNTIME_ROOT = _runtime_root()
@@ -93,7 +117,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Signature Wall", version="0.11.0", lifespan=lifespan)
+app = FastAPI(title="Signature Wall", version="0.12.0", lifespan=lifespan)
 app.mount("/static", NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
@@ -373,5 +397,8 @@ async def screen_websocket(websocket: WebSocket) -> None:
 
 
 def run() -> None:
-    print(f"Signature wall running on http://127.0.0.1:{PORT}")
+    base_url = f"http://127.0.0.1:{PORT}"
+    print(f"Signature wall running on {base_url}")
+    if should_open_browser():
+        open_startup_pages(base_url)
     uvicorn.run(app, host=HOST, port=PORT, log_level="info")
