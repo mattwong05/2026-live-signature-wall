@@ -23,6 +23,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from .models import (
     AdminConfigResponse,
+    BackgroundOpacityPayload,
     BackgroundImageResponse,
     ClearSignaturesResponse,
     CompletionResponse,
@@ -129,7 +130,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Signature Wall", version="0.12.5", lifespan=lifespan)
+app = FastAPI(title="Signature Wall", version="0.12.6", lifespan=lifespan)
 app.mount("/static", NoCacheStaticFiles(directory=str(STATIC_DIR)), name="static")
 app.mount("/uploads", StaticFiles(directory=str(UPLOADS_DIR)), name="uploads")
 
@@ -203,6 +204,7 @@ async def get_admin_config() -> AdminConfigResponse:
     host_ip = store.get_host_ip()
     response = AdminConfigResponse(
         background_image_url=store.get_background_image_url(),
+        background_image_opacity=store.get_background_image_opacity(),
         host_ip=host_ip,
         sign_page_url=build_sign_page_url(host_ip),
         screen_title=store.get_screen_title(),
@@ -221,6 +223,28 @@ async def update_host_ip(payload: HostIpPayload) -> AdminConfigResponse:
     host_ip = store.set_host_ip(payload.host_ip)
     return AdminConfigResponse(
         background_image_url=store.get_background_image_url(),
+        background_image_opacity=store.get_background_image_opacity(),
+        host_ip=host_ip,
+        sign_page_url=build_sign_page_url(host_ip),
+        screen_title=store.get_screen_title(),
+        pledge_lines=store.get_pledge_lines(),
+        signature_count=store.total_signature_count(),
+    )
+
+
+@app.put("/api/admin/config/background-opacity", response_model=AdminConfigResponse)
+async def update_background_opacity(payload: BackgroundOpacityPayload) -> AdminConfigResponse:
+    background_image_opacity = store.set_background_image_opacity(payload.background_image_opacity)
+    await notifier.broadcast(
+        {
+            "type": "background_opacity_updated",
+            "background_image_opacity": background_image_opacity,
+        }
+    )
+    host_ip = store.get_host_ip()
+    return AdminConfigResponse(
+        background_image_url=store.get_background_image_url(),
+        background_image_opacity=background_image_opacity,
         host_ip=host_ip,
         sign_page_url=build_sign_page_url(host_ip),
         screen_title=store.get_screen_title(),
@@ -241,6 +265,7 @@ async def update_screen_title(payload: ScreenTitlePayload) -> AdminConfigRespons
     host_ip = store.get_host_ip()
     return AdminConfigResponse(
         background_image_url=store.get_background_image_url(),
+        background_image_opacity=store.get_background_image_opacity(),
         host_ip=host_ip,
         sign_page_url=build_sign_page_url(host_ip),
         screen_title=screen_title,
@@ -261,6 +286,7 @@ async def update_pledge_lines(payload: PledgeLinesPayload) -> AdminConfigRespons
     host_ip = store.get_host_ip()
     return AdminConfigResponse(
         background_image_url=store.get_background_image_url(),
+        background_image_opacity=store.get_background_image_opacity(),
         host_ip=host_ip,
         sign_page_url=build_sign_page_url(host_ip),
         screen_title=store.get_screen_title(),

@@ -9,6 +9,8 @@ const expandedSigningOverlay = document.getElementById("expandedSigningOverlay")
 const phoneSigningHint = document.getElementById("phoneSigningHint");
 const statusMessage = document.getElementById("statusMessage");
 const pledgeLine = document.getElementById("pledgeLine");
+const pledgeSelectorField = document.getElementById("pledgeSelectorField");
+const pledgeSelect = document.getElementById("pledgeSelect");
 const toastCelebration = document.getElementById("toastCelebration");
 const toastMessage = document.getElementById("toastMessage");
 
@@ -131,8 +133,13 @@ function isPhoneLikeDevice() {
 function applyResponsiveCard() {
   const card = document.querySelector(".sign-card");
   const landscape = window.innerWidth > window.innerHeight;
+  const phoneMode = isPhoneLikeDevice();
   card.classList.toggle("landscape", landscape);
-  phoneSigningHint.classList.toggle("hidden", !isPhoneLikeDevice());
+  phoneSigningHint.classList.toggle("hidden", !phoneMode);
+  pledgeSelectorField.classList.toggle("hidden", !phoneMode || pledgeLines.length === 0);
+  if (phoneMode && pledgeLines.length > 0) {
+    updateSelectedPledge(Number(pledgeSelect.value || 0));
+  }
 }
 
 function setupSingleCanvas(targetCanvas) {
@@ -166,6 +173,24 @@ function chooseRandomPledge() {
   pledgeLine.textContent = pledgeLines[index];
 }
 
+function updateSelectedPledge(index) {
+  const safeIndex = Math.max(0, Math.min(pledgeLines.length - 1, index));
+  pledgeLine.textContent = pledgeLines[safeIndex] || "依法管水、科学配水、节水优先，守护右江灌区每一滴水";
+  if (pledgeSelect.options.length) {
+    pledgeSelect.value = String(safeIndex);
+  }
+}
+
+function renderPledgeSelector() {
+  pledgeSelect.replaceChildren();
+  pledgeLines.forEach((line, index) => {
+    const option = document.createElement("option");
+    option.value = String(index);
+    option.textContent = line;
+    pledgeSelect.appendChild(option);
+  });
+}
+
 async function loadSignConfig() {
   const response = await fetch("/api/sign-config");
   if (!response.ok) {
@@ -173,7 +198,13 @@ async function loadSignConfig() {
   }
   const data = await response.json();
   pledgeLines = Array.isArray(data.pledge_lines) ? data.pledge_lines : [];
-  chooseRandomPledge();
+  renderPledgeSelector();
+  if (isPhoneLikeDevice()) {
+    updateSelectedPledge(0);
+  } else {
+    chooseRandomPledge();
+  }
+  applyResponsiveCard();
 }
 
 async function requestSignFullscreen() {
@@ -496,6 +527,9 @@ submitButton.addEventListener("click", submitSignature);
 expandedSubmitButton.addEventListener("click", submitSignature);
 expandedCloseButton.addEventListener("click", () => {
   closeExpandedSigning();
+});
+pledgeSelect.addEventListener("change", () => {
+  updateSelectedPledge(Number(pledgeSelect.value));
 });
 
 expandedSigningOverlay.addEventListener("click", (event) => {

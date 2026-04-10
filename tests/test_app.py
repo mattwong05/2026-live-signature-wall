@@ -123,6 +123,14 @@ def test_background_image_setting_round_trip() -> None:
             state_response = client.get("/api/screen-state")
             assert state_response.status_code == 200
             assert state_response.json()["background_image_url"] == image_url
+            assert state_response.json()["background_image_opacity"] == 50
+
+            opacity_response = client.put(
+                "/api/admin/config/background-opacity",
+                json={"background_image_opacity": 100},
+            )
+            assert opacity_response.status_code == 200
+            assert opacity_response.json()["background_image_opacity"] == 100
 
             delete_response = client.delete("/api/admin/background-image")
             assert delete_response.status_code == 200
@@ -164,6 +172,14 @@ def test_admin_screen_title_round_trip() -> None:
             assert state_response.status_code == 200
             assert state_response.json()["screen_title"] == "欢迎来到签名现场"
 
+            empty_response = client.put("/api/admin/config/title", json={"screen_title": ""})
+            assert empty_response.status_code == 200
+            assert empty_response.json()["screen_title"] == ""
+
+            empty_state = client.get("/api/screen-state")
+            assert empty_state.status_code == 200
+            assert empty_state.json()["screen_title"] == ""
+
 
 def test_pledge_lines_round_trip_and_sign_config() -> None:
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -179,6 +195,10 @@ def test_pledge_lines_round_trip_and_sign_config() -> None:
             sign_config_response = client.get("/api/sign-config")
             assert sign_config_response.status_code == 200
             assert sign_config_response.json()["pledge_lines"] == pledge_lines
+
+            admin_config_response = client.get("/api/admin/config")
+            assert admin_config_response.status_code == 200
+            assert admin_config_response.json()["background_image_opacity"] == 50
 
 
 def test_export_signatures_zip_contains_pngs() -> None:

@@ -122,6 +122,7 @@ class SignatureStore:
             background_signatures=[self._row_to_record(row) for row in background_rows],
             pending_signatures=[self._row_to_record(row) for row in pending_rows],
             background_image_url=self.get_background_image_url(),
+            background_image_opacity=self.get_background_image_opacity(),
         )
 
     def complete_signature(self, signature_id: str) -> SignatureRecord:
@@ -214,6 +215,33 @@ class SignatureStore:
         self._delete_previous_background_file(previous, None)
         return BackgroundImageResponse(background_image_url=None)
 
+    def get_background_image_opacity(self) -> int:
+        with self._connection() as conn:
+            row = conn.execute(
+                """
+                SELECT value
+                FROM settings
+                WHERE key = 'background_image_opacity'
+                """
+            ).fetchone()
+        if row is None:
+            return 50
+        return max(0, min(100, int(row["value"])))
+
+    def set_background_image_opacity(self, opacity: int) -> int:
+        normalized = max(0, min(100, int(opacity)))
+        with self._connection() as conn:
+            conn.execute(
+                """
+                INSERT INTO settings (key, value)
+                VALUES ('background_image_opacity', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (str(normalized),),
+            )
+            conn.commit()
+        return normalized
+
     def get_host_ip(self) -> str | None:
         with self._connection() as conn:
             row = conn.execute(
@@ -274,7 +302,7 @@ class SignatureStore:
                 """
             ).fetchone()
         if row is None:
-            return "现场签名正在汇聚"
+            return ""
         return row["value"]
 
     def set_screen_title(self, screen_title: str) -> str:

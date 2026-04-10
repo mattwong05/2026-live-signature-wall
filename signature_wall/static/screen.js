@@ -13,6 +13,7 @@ let backgroundItems = [];
 let pendingQueue = [];
 let playing = false;
 let backgroundImageUrl = null;
+let backgroundImageOpacity = 50;
 let currentPlaybackSignature = null;
 let playbackRunId = 0;
 let endingSequence = null;
@@ -46,9 +47,17 @@ function updateBackgroundImage(url) {
   if (url) {
     backgroundImageLayer.style.backgroundImage = `url("${url}?ts=${Date.now()}")`;
     backgroundImageLayer.classList.add("visible");
+    backgroundImageLayer.style.opacity = String(backgroundImageOpacity / 100);
   } else {
     backgroundImageLayer.style.backgroundImage = "";
     backgroundImageLayer.classList.remove("visible");
+  }
+}
+
+function updateBackgroundOpacity(opacity) {
+  backgroundImageOpacity = Math.max(0, Math.min(100, Number(opacity) || 0));
+  if (backgroundImageUrl) {
+    backgroundImageLayer.style.opacity = String(backgroundImageOpacity / 100);
   }
 }
 
@@ -103,7 +112,9 @@ function buildTightTransform(bounds, targetWidth, targetHeight, padding) {
 }
 
 function setScreenTitle(title) {
-  screenTitle.textContent = title || "现场签名正在汇聚";
+  const normalized = (title || "").trim();
+  screenTitle.textContent = normalized;
+  screenTitle.classList.toggle("hidden", !normalized);
 }
 
 function drawStrokePoint(context, point, transform, radius) {
@@ -874,6 +885,11 @@ function connectWebSocket() {
       return;
     }
 
+    if (payload.type === "background_opacity_updated") {
+      updateBackgroundOpacity(payload.background_image_opacity);
+      return;
+    }
+
     if (payload.type === "screen_title_updated") {
       setScreenTitle(payload.screen_title);
       return;
@@ -928,6 +944,7 @@ async function bootstrap() {
     backgroundItems = state.background_signatures.map(createBackgroundItem);
     relayoutBackgroundItems();
     pendingQueue = state.pending_signatures;
+    updateBackgroundOpacity(state.background_image_opacity);
     updateBackgroundImage(state.background_image_url);
     setScreenTitle(state.screen_title);
     if (pendingQueue.length > 0) {

@@ -23,6 +23,11 @@
           <div id="emptyState" class="preview-empty">当前未设置背景图</div>
         </div>
 
+        <label class="field">
+          <span>背景显示强度：<strong id="backgroundOpacityValue">50%</strong></span>
+          <input id="backgroundOpacityInput" type="range" min="0" max="100" step="1" value="50">
+        </label>
+
         <div class="controls">
           <input id="backgroundFile" type="file" accept="image/png,image/jpeg,image/webp">
           <div class="actions">
@@ -51,8 +56,8 @@
       <section class="admin-section">
         <h2>大屏标题</h2>
         <label class="field">
-          <span>Screen 标题</span>
-          <input id="screenTitleInput" type="text" placeholder="例如 现场签名正在汇聚">
+          <span>Screen 标题，可留空</span>
+          <input id="screenTitleInput" type="text" placeholder="留空则不显示标题">
         </label>
         <div class="actions">
           <button id="saveTitleButton" type="button" class="primary">保存标题</button>
@@ -62,7 +67,7 @@
       <section class="admin-section">
         <h2>签名端宣誓文案列表</h2>
         <label class="field">
-          <span>每行一条，签名端会随机展示其中 1 条</span>
+          <span>每行一条，手机端由用户自行选择其中 1 条</span>
           <textarea id="pledgeLinesInput" rows="7" placeholder="每行输入一条宣誓文案"></textarea>
         </label>
         <div class="actions">

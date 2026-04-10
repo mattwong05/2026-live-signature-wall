@@ -4,6 +4,8 @@ const clearButton = document.getElementById("clearButton");
 const backgroundPreview = document.getElementById("backgroundPreview");
 const emptyState = document.getElementById("emptyState");
 const adminStatus = document.getElementById("adminStatus");
+const backgroundOpacityInput = document.getElementById("backgroundOpacityInput");
+const backgroundOpacityValue = document.getElementById("backgroundOpacityValue");
 const hostIpInput = document.getElementById("hostIpInput");
 const saveIpButton = document.getElementById("saveIpButton");
 const signPageUrl = document.getElementById("signPageUrl");
@@ -20,6 +22,7 @@ const endSequenceButton = document.getElementById("endSequenceButton");
 let refreshTimer = null;
 let adminSocket = null;
 let adminSocketRetryTimer = null;
+let backgroundOpacitySaveTimer = null;
 
 function showStatus(message, isError = false) {
   adminStatus.textContent = message;
@@ -38,6 +41,12 @@ function updatePreview(imageUrl) {
   }
 }
 
+function setBackgroundOpacityValue(opacity) {
+  const normalized = Number.isFinite(Number(opacity)) ? Math.max(0, Math.min(100, Number(opacity))) : 50;
+  backgroundOpacityInput.value = String(normalized);
+  backgroundOpacityValue.textContent = `${normalized}%`;
+}
+
 async function loadAdminConfig() {
   const response = await fetch("/api/admin/config", {
     cache: "no-store",
@@ -47,6 +56,7 @@ async function loadAdminConfig() {
   }
   const data = await response.json();
   updatePreview(data.background_image_url);
+  setBackgroundOpacityValue(data.background_image_opacity);
   hostIpInput.value = data.host_ip || "";
   updateQrState(data.sign_page_url);
   screenTitleInput.value = data.screen_title || "";
@@ -81,6 +91,7 @@ function connectAdminSocket() {
         payload.type === "signature_submitted" ||
         payload.type === "signatures_cleared" ||
         payload.type === "background_image_updated" ||
+        payload.type === "background_opacity_updated" ||
         payload.type === "screen_title_updated" ||
         payload.type === "pledge_lines_updated"
       ) {
@@ -212,10 +223,6 @@ saveIpButton.addEventListener("click", async () => {
 
 saveTitleButton.addEventListener("click", async () => {
   const screenTitle = screenTitleInput.value.trim();
-  if (!screenTitle) {
-    showStatus("请先输入大屏标题。", true);
-    return;
-  }
 
   saveTitleButton.disabled = true;
   showStatus("正在保存大屏标题...");
@@ -240,6 +247,39 @@ saveTitleButton.addEventListener("click", async () => {
   } finally {
     saveTitleButton.disabled = false;
   }
+});
+
+async function saveBackgroundOpacity(opacity) {
+  const response = await fetch("/api/admin/config/background-opacity", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ background_image_opacity: opacity }),
+  });
+  if (!response.ok) {
+    throw new Error("Save background opacity failed");
+  }
+  const data = await response.json();
+  setBackgroundOpacityValue(data.background_image_opacity);
+}
+
+backgroundOpacityInput.addEventListener("input", () => {
+  setBackgroundOpacityValue(backgroundOpacityInput.value);
+  showStatus("正在调整背景显示强度...");
+
+  if (backgroundOpacitySaveTimer) {
+    window.clearTimeout(backgroundOpacitySaveTimer);
+  }
+  backgroundOpacitySaveTimer = window.setTimeout(async () => {
+    try {
+      await saveBackgroundOpacity(backgroundOpacityInput.value);
+      showStatus("背景显示强度已更新。");
+    } catch (error) {
+      console.error(error);
+      showStatus("保存背景显示强度失败，请重试。", true);
+    }
+  }, 180);
 });
 
 savePledgesButton.addEventListener("click", async () => {

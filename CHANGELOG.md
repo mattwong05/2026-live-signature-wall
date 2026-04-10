@@ -18,6 +18,21 @@ The format is based on Keep a Changelog.
 ### Removed
 - None.
 
+## [0.12.6] - 2026-04-10
+
+### Added
+- 管理页新增背景显示强度滑块，可实时调整背景图透明度。
+
+### Changed
+- 大屏标题现在允许为空，留空时不显示标题。
+- 签名页手机端改为让用户手动选择宣誓文案，不再随机展示。
+
+### Fixed
+- 删除大屏页左上角固定显示的英文副标题 `Signature Wall`。
+
+### Removed
+- None.
+
 ## [0.12.5] - 2026-04-09
 
 ### Added
